@@ -2,6 +2,7 @@ import requests
 import json
 
 from collections import defaultdict
+from metadata_schema import metadata_schema
 
 DToL_STUDY_ID = "PRJEB40665"
 DToL_EXPERIMENTS = defaultdict(list)
@@ -14,14 +15,27 @@ def main():
     Collect DToL metadata from BioSamples, experiments and assemblies from the ENA
     :return:
     """
+    # collect required experiments and assemblies fields
+    experiment_fields = list()
+    assemblies_fields = list()
+    for field in metadata_schema["fields"]:
+        if field["name"] == "experiments":
+            for experiment_field in field["fields"]:
+                experiment_fields.append(experiment_field["name"])
+        elif field["name"] == "assemblies":
+            for assemblies_field in field["fields"]:
+                assemblies_fields.append(assemblies_field["name"])
+
     # Collect all experiments
     raw_data = requests.get(
-        f"https://www.ebi.ac.uk/ena/portal/api/filereport?accession={DToL_STUDY_ID}&result=read_run&fields=all"
-        f"&format=json&limit=0").json()
+        f"https://www.ebi.ac.uk/ena/portal/api/filereport?accession={DToL_STUDY_ID}&result=read_run"
+        f"&fields={','.join(experiment_fields)}&format=json&limit=0").json()
     # Collect all assemblies
     assemblies = requests.get(
-        f"https://www.ebi.ac.uk/ena/portal/api/filereport?accession={DToL_STUDY_ID}&result=assembly&fields=all"
-        f"&format=json&limit=0").json()
+        f"https://www.ebi.ac.uk/ena/portal/api/filereport?accession={DToL_STUDY_ID}&result=assembly"
+        f"&fields={','.join(assemblies_fields)}&format=json&limit=0").json()
+
+    # aggregate experiments and assemblies in the dict(key: biosample_id, value: data record)
     aggregate_data_records(raw_data, "experiments")
     aggregate_data_records(assemblies, "assemblies")
 

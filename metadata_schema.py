@@ -213,7 +213,7 @@ metadata_schema = {
                     "mode": "NULLABLE"
                 },
                 {
-                    "name": "fsubmitted_ftp",
+                    "name": "submitted_ftp",
                     "type": "STRING",
                     "mode": "NULLABLE"
                 },
