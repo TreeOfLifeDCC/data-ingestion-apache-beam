@@ -280,6 +280,28 @@ metadata_schema = {
                     "mode": "NULLABLE"
                 }
             ]
+        },
+        {
+            "name": "relationships",
+            "type": "RECORD",
+            "mode": "REPEATED",
+            "fields": [
+                {
+                    "name": "source",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "type",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "target",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                }
+            ]
         }
     ]
 }
