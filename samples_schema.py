@@ -1,4 +1,4 @@
-metadata_schema = {
+samples_schema = {
     "fields": [
         {
             "name": "biosample_id",
