@@ -2,7 +2,7 @@ import requests
 import json
 
 from collections import defaultdict
-from metadata_schema import metadata_schema
+from samples_schema import metadata_schema
 
 DToL_STUDY_ID = "PRJEB40665"
 DToL_EXPERIMENTS = defaultdict(list)

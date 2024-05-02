@@ -2,66 +2,74 @@ import requests
 import apache_beam as beam
 from lxml import etree
 
-# ParDo class for samples classification
-class ClassifySamples(beam.DoFn):
-    def process(self, element, *args, **kwargs):
-        if 'ENA-CHECKLIST' not in element["characteristics"] or element["characteristics"]["ENA-CHECKLIST"][0]["text"] in ["ERC000053", "ERC000011"]:
-            # TODO: check for 'sample symbiont of'
-            if "symbiont" in element["characteristics"] and element["characteristics"]["symbiont"][0]["text"] == "Y":
-                return [beam.pvalue.TaggedOutput("Symbionts", element)]
+SPECIMENS_SYMBIONTS_CHECKLISTS = ["ERC000011", "ERC000053"]
+METAGENOMES_CHECKLISTS = ["ERC000013", "ERC000024", "ERC000025", "ERC000047", "ERC000050"]
+
+def classify_samples(sample):
+    try:
+        checklist = sample["characteristics"]["ENA-CHECKLIST"][0]["text"]
+        if checklist in SPECIMENS_SYMBIONTS_CHECKLISTS:
+            if ("symbiont" in sample["characteristics"]
+                    and sample["characteristics"]["symbiont"][0]["text"] == "Y"):
+                yield beam.pvalue.TaggedOutput("Symbionts", sample)
             else:
-                if "sample derived from" in element["characteristics"]:
-                    return [beam.pvalue.TaggedOutput("Specimens", element)]
-                else:
-                    return [element]
+                yield sample
+        elif checklist in METAGENOMES_CHECKLISTS:
+            yield beam.pvalue.TaggedOutput("Metagenomes", sample)
         else:
-            # TODO: check for 'sample derived from'
-            return [beam.pvalue.TaggedOutput("Metagenomes", element)]
+            yield beam.pvalue.TaggedOutput("Errors", sample)
+    except KeyError:
+        yield beam.pvalue.TaggedOutput("Errors", sample)
+
 
 
 # Helper functions
-def check_field_existence(sample, field_name, units=False, ontology=False):
-    if units:
-        if field_name in sample:
-            return {
-                'text': sample[field_name][0]['text'],
-                'unit': sample[field_name][0]['unit']
-            }
-        else:
-            return {
-                'text': None,
-                'unit': None
-            }
-    elif ontology:
-        if field_name in sample:
-            return {
-                'text': sample[field_name][0]['text'],
-                'ontologyTerm': sample[field_name][0]['ontologyTerms'][0]
-            }
-        else:
-            return {
-                'text': None,
-                'unit': None
-            }
-    else:
-        if field_name in sample:
-            return sample[field_name][0]['text']
-        else:
-            return None
+def check_field_existence(record):
+    values = list()
+    units = list()
+    ontology_terms = list()
+    for element in record:
+        values.append(element["text"])
+        try:
+            units.append(element["unit"])
+        except KeyError:
+            pass
+        try:
+            ontology_terms.append(element["ontologyTerms"][0])
+        except KeyError:
+            pass
+    return ", ".join(values), ", ".join(units), ", ".join(ontology_terms)
 
 
 # Processing for specimens and organisms
-def process_organisms_specimens(sample):
-    record = dict()
-    record['biosample_id'] = sample['accession']
-    record['organism'] = check_field_existence(sample['characteristics'], 'organism')
-    # TODO: check if this name is not None
-    record['common_name'] = get_common_name(record['organism'])
-    record['sex'] = check_field_existence(sample['characteristics'], 'sex')
-    record['organism_part'] = check_field_existence(sample['characteristics'], 'organism part')
-    record['latitude'] = check_field_existence(sample['characteristics'], 'geographic location (latitude)')
-    record['longitude'] = check_field_existence(sample['characteristics'], 'geographic location (longitude)')
-    return (sample['taxId'], record)
+# def process_specimens_for_dwh(sample):
+# #     dwh_record = dict()
+# #     dwh_record['biosample_id'] = sample['accession']
+# #     dwh_record['organism'] = check_field_existence(sample['characteristics'], 'organism')
+# #     dwh_record['common_name'] = get_common_name(record['organism'])
+# #     dwh_record['sex'] = check_field_existence(sample['characteristics'], 'sex')
+# #     dwh_record['organism_part'] = check_field_existence(sample['characteristics'], 'organism part')
+# #     return sample['taxId'], record
+
+def process_specimens_for_data_portal(sample):
+    data_portal_record = dict()
+    data_portal_record["biosample_id"] = sample['accession']
+    if "experiments" in sample and len(sample["experiments"]) > 0:
+        data_portal_record["tracking_status"] = "Raw Data - Submitted"
+    elif "assemblies" in sample and len(sample["assemblies"]) > 0:
+        data_portal_record["tracking_status"] = "Assemblies - Submitted"
+    else:
+        data_portal_record["tracking_status"] = "Submitted to BioSamples"
+    data_portal_record["characteristics"] = list()
+    for record_name, record in sample['characteristics'].items():
+        values, units, ontology_terms = check_field_existence(record)
+        data_portal_record["characteristics"].append({
+            "field_name": record_name,
+            "field_value": values,
+            "unit": units,
+            "ontology_term": ontology_terms
+        })
+    yield data_portal_record
 
 
 # Processing for symbionts
