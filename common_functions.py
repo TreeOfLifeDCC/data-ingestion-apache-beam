@@ -17,9 +17,15 @@ def classify_samples(sample):
         elif checklist in METAGENOMES_CHECKLISTS:
             yield beam.pvalue.TaggedOutput("Metagenomes", sample)
         else:
-            yield beam.pvalue.TaggedOutput("Errors", sample)
+            yield beam.pvalue.TaggedOutput("Errors", {
+                "biosample_id": sample["accession"],
+                "checklist": checklist
+            })
     except KeyError:
-        yield beam.pvalue.TaggedOutput("Errors", sample)
+        yield beam.pvalue.TaggedOutput("Errors", {
+            "biosample_id": sample["accession"],
+            "checklist": "wasn't found"
+        })
 
 
 

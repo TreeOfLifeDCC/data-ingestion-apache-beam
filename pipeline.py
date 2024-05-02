@@ -10,6 +10,7 @@ from apache_beam.runners import DataflowRunner, DirectRunner
 
 from table_schema import table_schema
 from samples_schema import samples_schema
+from checklist_errors_schema import checklist_errors_schema
 from common_functions import (classify_samples, process_specimens_for_dwh, process_specimens_for_data_portal)
 
 # Command line arguments
@@ -70,6 +71,12 @@ data_portal_specimens_processing = (
 data_portal_specimens_processing | "Write to BigQuery" >> beam.io.WriteToBigQuery(
     f'{opts.project}:dtol.specimens',
     schema=samples_schema,
+    create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
+    write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
+)
+errors_collection | "Write to Errors BigQuery" >> beam.io.WriteToBigQuery(
+    f'{opts.project}:dtol.checklist_errors',
+    schema=checklist_errors_schema,
     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
 )
