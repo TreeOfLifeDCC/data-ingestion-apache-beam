@@ -2,7 +2,7 @@ import requests
 import json
 
 from collections import defaultdict
-from samples_schema import metadata_schema
+from dependencies.samples_schema import samples_schema
 
 DToL_STUDY_ID = "PRJEB40665"
 DToL_EXPERIMENTS = defaultdict(list)
@@ -18,7 +18,7 @@ def main():
     # collect required experiments and assemblies fields
     experiment_fields = list()
     assemblies_fields = list()
-    for field in metadata_schema["fields"]:
+    for field in samples_schema["fields"]:
         if field["name"] == "experiments":
             for experiment_field in field["fields"]:
                 experiment_fields.append(experiment_field["name"])
@@ -60,6 +60,11 @@ def main():
     for sample_id, record in DToL_SAMPLES.items():
         if 'sample derived from' in record['characteristics']:
             host_sample_id = record['characteristics']['sample derived from'][0]['text']
+            if host_sample_id not in DToL_SAMPLES and host_sample_id not in additional_samples:
+                additional_samples[host_sample_id] = requests.get(
+                    f"https://www.ebi.ac.uk/biosamples/samples/{host_sample_id}").json()
+        elif 'sample symbiont of' in record['characteristics']:
+            host_sample_id = record['characteristics']['sample symbiont of'][0]['text']
             if host_sample_id not in DToL_SAMPLES and host_sample_id not in additional_samples:
                 additional_samples[host_sample_id] = requests.get(
                     f"https://www.ebi.ac.uk/biosamples/samples/{host_sample_id}").json()
