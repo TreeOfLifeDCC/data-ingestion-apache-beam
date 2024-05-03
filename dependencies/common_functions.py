@@ -269,7 +269,7 @@ def final_formatting(element):
     sample['currentStatus'] = 'Assemblies - Submitted' if len(sample['assemblies']) != 0 else sample['currentStatus']
 
     data_portal_response = requests.get(
-        f"https://portal.darwintreeoflife.org/api/root_organisms/root?id={sample['scientific_name']}").json()
+        f"https://portal.darwintreeoflife.org/api/root_organisms/root?id={sample['organism']}").json()
     if 'annotation' in data_portal_response and len(data_portal_response['annotation']) > 0:
         sample['currentStatus'] = 'Annotation Complete'
         sample['annotation'] = data_portal_response['annotation']
