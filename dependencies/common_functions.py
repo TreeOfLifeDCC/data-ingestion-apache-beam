@@ -82,7 +82,7 @@ def process_records_for_dwh(sample, sample_type):
         dwh_record["trackingSystem"] = "Submitted to BioSamples"
 
     if sample_type == 'specimens':
-        return sample['taxId'], record
+        return sample['taxId'], dwh_record
     elif sample_type == "symbionts":
         try:
             host_biosample_id = sample['characteristics']['sample symbiont of'][0]['text']
@@ -90,7 +90,7 @@ def process_records_for_dwh(sample, sample_type):
             error_sample['error_message'] = "missing 'sample symbiont of' field for symbiont sample"
             return beam.pvalue.TaggedOutput("Errors", error_sample)
         host_sample = requests.get(f"https://www.ebi.ac.uk/biosamples/samples/{host_biosample_id}.json").json()
-        return host_sample['taxId'], record
+        return host_sample['taxId'], dwh_record
     else:
         try:
             host_biosample_id = sample['characteristics']['sample derived from'][0]['text']
@@ -105,7 +105,7 @@ def process_records_for_dwh(sample, sample_type):
                 error_sample['error_message'] = "missing 'sample derived from' field for metagenome sample"
                 return beam.pvalue.TaggedOutput("Errors", error_sample)
             host_sample = requests.get(f"https://www.ebi.ac.uk/biosamples/samples/{host_biosample_id}.json").json()
-        return host_sample['taxId'], record
+        return host_sample['taxId'], dwh_record
 
 
 def process_specimens_for_data_portal(sample):
