@@ -278,11 +278,18 @@ def final_formatting(element):
     sample['annotation_status'] = 'Waiting'
     if sample['currentStatus'] == 'Annotation Complete':
         sample['annotation_complete'] = 'Done'
+    else:
+        sample['annotation_complete'] = 'Waiting'
     if len(sample['assemblies']) > 0:
         sample['assemblies_status'] = 'Done'
+    else:
+        sample['assemblies_status'] = 'Waiting'
     if len(sample['experiment']) > 0:
         sample['mapped_reads'] = 'Done'
         sample['raw_data'] = 'Done'
+    else:
+        sample['mapped_reads'] = 'Waiting'
+        sample['raw_data'] = 'Waiting'
     sample['trackingSystem'] = [
         {'name': 'biosamples', 'status': sample['biosamples'], 'rank': 1},
         {'name': 'mapped_reads', 'status': sample['mapped_reads'], 'rank': 2},
