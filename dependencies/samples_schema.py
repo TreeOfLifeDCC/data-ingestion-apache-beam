@@ -236,6 +236,56 @@ samples_schema = {
                     "name": "library_construction_protocol",
                     "type": "STRING",
                     "mode": "NULLABLE"
+                },
+                {
+                    "name": "sra_bytes",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "sra_md5",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "sra_ftp",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "sra_aspera",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "sra_galaxy",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "sample_alias",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "broker_name",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "sample_title",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "nominal_sdev",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
+                },
+                {
+                    "name": "first_created",
+                    "type": "STRING",
+                    "mode": "NULLABLE"
                 }
             ]
         },
