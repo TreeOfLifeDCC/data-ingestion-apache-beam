@@ -57,7 +57,10 @@ def process_records_for_dwh(sample, sample_type):
     except KeyError:
         dwh_record['organism'] = {'text': None, 'ontologyTerm': None}
 
-    dwh_record['commonName'] = get_common_name(record['organism'])
+    if dwh_record['organism']['text']:
+        dwh_record['commonName'] = get_common_name(dwh_record['organism']['text'])
+    else:
+        dwh_record['commonName'] = None
 
     try:
         sex_name, _, _ = check_field_existence(sample['characteristics']['sex'])
