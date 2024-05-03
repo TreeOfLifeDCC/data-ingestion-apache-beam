@@ -11,7 +11,8 @@ from apache_beam.runners import DataflowRunner, DirectRunner
 # from table_schema import table_schema
 from dependencies.samples_schema import samples_schema
 from dependencies.checklist_errors_schema import checklist_errors_schema
-from dependencies.common_functions import (classify_samples, process_specimens_for_data_portal)
+from dependencies.symbionts_metagenomes_errors_schema import symbionts_metagenomes_errors_schema
+from dependencies.common_functions import (classify_samples, process_specimens_for_data_portal, process_records_for_dwh)
 
 # Command line arguments
 parser = argparse.ArgumentParser(description='Load DToL data from Json into BigQuery')
@@ -58,14 +59,9 @@ specimens_collection = input_data.Specimens
 symbionts_collection = input_data.Symbionts
 metagenomes_collection = input_data.Metagenomes
 
-# dwh_specimens_processing = (
-#         specimens_collection
-#         | "Create specimens tuple" >> beam.Map(process_specimens_for_dwh)
-# )
-
 data_portal_specimens_processing = (
     specimens_collection
-    | "Create data portal specimens record" >> beam.Map(process_specimens_for_data_portal)
+    | "Create data portal specimens records" >> beam.Map(process_specimens_for_data_portal)
 )
 
 data_portal_specimens_processing | "Write to BigQuery" >> beam.io.WriteToBigQuery(
@@ -77,6 +73,38 @@ data_portal_specimens_processing | "Write to BigQuery" >> beam.io.WriteToBigQuer
 errors_collection | "Write to Errors BigQuery" >> beam.io.WriteToBigQuery(
     table='prj-ext-prod-dtol-gcp-dr:dtol.checklist_errors',
     schema=checklist_errors_schema,
+    create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
+    write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
+)
+
+dwh_specimens_processing = (
+        specimens_collection
+        | "Create dwh specimens records tuple" >> beam.Map(process_records_for_dwh, "specimens").with_outputs(
+    "Errors", main="Normal")
+)
+
+dwh_symbionts_processing = (
+    symbionts_collection
+    | "Create dwh symbionts records tuple" >> beam.map(process_records_for_dwh, "symbionts").with_outputs(
+    "Errors", main="Normal")
+)
+
+dwh_metagenomes_processing = (
+    metagenomes_collection
+    | "Create dwh metagenomes records tupe" >> beam.Map(process_records_for_dwh, "metagenomes").with_outputs(
+    "Errors", main="Normal")
+)
+
+dwh_symbionts_processing.Errors | "Write symbionts errors to BigQuery" >> beam.io.WriteToBigQuery(
+    table='prj-ext-prod-dtol-gcp-dr:dtol.symbionts_errors',
+    schema=symbionts_metagenomes_errors_schema,
+    create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
+    write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
+)
+
+dwh_metagenomes_processing.Errors | "Write metagenomes errors to BigQuery" >> beam.io.WriteToBigQuery(
+    table='prj-ext-prod-dtol-gcp-dr:dtol.metagenomes_errors',
+    schema=symbionts_metagenomes_errors_schema,
     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
 )

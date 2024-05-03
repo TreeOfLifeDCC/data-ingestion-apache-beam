@@ -27,8 +27,6 @@ def classify_samples(sample):
         return beam.pvalue.TaggedOutput("Errors", error_sample)
 
 
-
-# Helper functions
 def check_field_existence(record):
     values = list()
     units = list()
@@ -46,15 +44,66 @@ def check_field_existence(record):
     return ", ".join(values), ", ".join(units), ", ".join(ontology_terms)
 
 
-# Processing for specimens and organisms
-# def process_specimens_for_dwh(sample):
-# #     dwh_record = dict()
-# #     dwh_record['biosample_id'] = sample['accession']
-# #     dwh_record['organism'] = check_field_existence(sample['characteristics'], 'organism')
-# #     dwh_record['common_name'] = get_common_name(record['organism'])
-# #     dwh_record['sex'] = check_field_existence(sample['characteristics'], 'sex')
-# #     dwh_record['organism_part'] = check_field_existence(sample['characteristics'], 'organism part')
-# #     return sample['taxId'], record
+def process_records_for_dwh(sample, sample_type):
+    error_sample = dict()
+    error_sample['biosample_id'] = sample["accession"]
+
+    dwh_record = dict()
+    dwh_record['accession'] = sample['accession']
+
+    try:
+        organism_name, organism_ontology, _ = check_field_existence(sample['characteristics']['organism'])
+        dwh_record['organism'] = {'text': organism_name, 'ontologyTerm': organism_ontology}
+    except KeyError:
+        dwh_record['organism'] = {'text': None, 'ontologyTerm': None}
+
+    dwh_record['commonName'] = get_common_name(record['organism'])
+
+    try:
+        sex_name, _, _ = check_field_existence(sample['characteristics']['sex'])
+        dwh_record['sex'] = sex_name
+    except KeyError:
+        dwh_record['sex'] = None
+
+    try:
+        organism_part_name, _, _ = check_field_existence(sample['characteristics']['organism part'])
+        dwh_record['organismPart'] = organism_part_name
+    except KeyError:
+        dwh_record['organismPart'] = None
+
+    if "experiments" in sample and len(sample["experiments"]) > 0:
+        dwh_record["trackingSystem"] = "Raw Data - Submitted"
+    elif "assemblies" in sample and len(sample["assemblies"]) > 0:
+        dwh_record["trackingSystem"] = "Assemblies - Submitted"
+    else:
+        dwh_record["trackingSystem"] = "Submitted to BioSamples"
+
+    if sample_type == 'specimens':
+        return sample['taxId'], record
+    elif sample_type == "symbionts":
+        try:
+            host_biosample_id = sample['characteristics']['sample symbiont of'][0]['text']
+        except KeyError:
+            error_sample['error_message'] = "missing 'sample symbiont of' field for symbiont sample"
+            return beam.pvalue.TaggedOutput("Errors", error_sample)
+        host_sample = requests.get(f"https://www.ebi.ac.uk/biosamples/samples/{host_biosample_id}.json").json()
+        return host_sample['taxId'], record
+    else:
+        try:
+            host_biosample_id = sample['characteristics']['sample derived from'][0]['text']
+        except KeyError:
+            error_sample['error_message'] = "missing 'sample derived from' field for metagenome sample"
+            return beam.pvalue.TaggedOutput("Errors", error_sample)
+        host_sample = requests.get(f"https://www.ebi.ac.uk/biosamples/samples/{host_biosample_id}.json").json()
+        while host_sample["characteristics"]["ENA-CHECKLIST"][0]["text"] != "ERC000053":
+            try:
+                host_biosample_id = host_sample['characteristics']['sample derived from'][0]['text']
+            except KeyError:
+                error_sample['error_message'] = "missing 'sample derived from' field for metagenome sample"
+                return beam.pvalue.TaggedOutput("Errors", error_sample)
+            host_sample = requests.get(f"https://www.ebi.ac.uk/biosamples/samples/{host_biosample_id}.json").json()
+        return host_sample['taxId'], record
+
 
 def process_specimens_for_data_portal(sample):
     data_portal_record = dict()
@@ -74,36 +123,9 @@ def process_specimens_for_data_portal(sample):
             "unit": units,
             "ontology_term": ontology_terms
         })
+    if "relationships" in sample and len(sample["relationships"]) > 0:
+        data_portal_record["relationships"] = sample["relationships"]
     return data_portal_record
-
-
-# Processing for symbionts
-def process_symbiont(sample):
-    host_biosample_id = sample['characteristics']['sample symbiont of'][0]['text']
-    host_sample = requests.get(f"https://www.ebi.ac.uk/biosamples/samples/{host_biosample_id}.json").json()
-    record = dict()
-    record['biosample_id'] = sample['accession']
-    record['organism'] = check_field_existence(sample['characteristics'], 'organism')
-    record['common_name'] = get_common_name(record['organism'])
-    record['sex'] = check_field_existence(sample['characteristics'], 'sex')
-    record['organism_part'] = check_field_existence(sample['characteristics'], 'organism part')
-    return (host_sample['taxId'], record)
-
-
-# Processing for metagenomes
-def process_metagenomes(sample):
-    host_biosample_id = sample['characteristics']['sample derived from'][0]['text']
-    host_sample = requests.get(f"https://www.ebi.ac.uk/biosamples/samples/{host_biosample_id}.json").json()
-    while host_sample["characteristics"]["ENA-CHECKLIST"][0]["text"] != "ERC000053":
-        host_biosample_id = host_sample['characteristics']['sample derived from'][0]['text']
-        host_sample = requests.get(f"https://www.ebi.ac.uk/biosamples/samples/{host_biosample_id}.json").json()
-    record = dict()
-    record['biosample_id'] = sample['accession']
-    record['organism'] = check_field_existence(sample['characteristics'], 'organism')
-    record['common_name'] = get_common_name(record['organism'])
-    record['sex'] = check_field_existence(sample['characteristics'], 'sex')
-    record['organism_part'] = check_field_existence(sample['characteristics'], 'organism part')
-    return (host_sample['taxId'], record)
 
 
 def get_reads(sample):
@@ -156,23 +178,6 @@ def get_reads(sample):
                 experiment['library_construction_protocol'] = 'Not specified'
 
         return (tax_id, experiments)
-
-
-def parse_assemblies(sample):
-    if 'accession' in sample:
-        sample_id = sample['accession']
-        tax_id = sample['taxId']
-    else:
-        sample_id = sample[1]['biosample_id']
-        tax_id = sample[0]
-    assemblies_data = requests.get(f"https://www.ebi.ac.uk/ena/portal/api/"
-                                   f"links/sample?format=json"
-                                   f"&accession={sample_id}&result=assembly"
-                                   f"&offset=0&limit=1000")
-    if assemblies_data.status_code != 200:
-        return (tax_id, list())
-    else:
-        return (tax_id, assemblies_data.json())
 
 
 def merge_data_records(sample):
