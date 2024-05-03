@@ -85,7 +85,7 @@ dwh_specimens_processing = (
 
 dwh_symbionts_processing = (
     symbionts_collection
-    | "Create dwh symbionts records tuple" >> beam.map(process_records_for_dwh, "symbionts").with_outputs(
+    | "Create dwh symbionts records tuple" >> beam.Map(process_records_for_dwh, "symbionts").with_outputs(
     "Errors", main="Normal")
 )
 
