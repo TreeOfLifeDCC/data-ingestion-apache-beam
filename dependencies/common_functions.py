@@ -203,32 +203,30 @@ def get_common_name(latin_name):
 
 
 def final_formatting(element):
-    phylogenetic_ranks = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species')
+    phylogenetic_ranks = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species', 'cohort', 'forma',
+                          'infraclass', 'infraorder', 'parvorder', 'section', 'series', 'species_group',
+                          'species_subgroup', 'subclass', 'subcohort', 'subfamily', 'subgenus', 'subkingdom',
+                          'suborder', 'subphylum', 'subsection', 'subspecies', 'subtribe', 'superclass', 'superfamily',
+                          'superkingdom', 'superorder', 'superphylum', 'tribe', 'varietas')
     sample = dict()
     # host metadata
     sample['tax_id'] = element[0]
-    try:
-        sample['scientific_name'] = element[1]['organisms'][0]['organism']
-    except IndexError:
-        sample['organisms'] = element[1]['organisms']
-        sample['specimens'] = element[1]['specimens']
-        sample['symbionts'] = element[1]['symbionts']
-        sample['metagenomes'] = element[1]['metagenomes']
-        sample['error_message'] = "Species without organisms"
-        return beam.pvalue.TaggedOutput('error', sample)
-    sample['common_name'] = element[1]['organisms'][0]['common_name']
-    sample['current_status'] = 'Submitted to BioSamples'
-    sample['organisms'] = element[1]['organisms']
-    sample['specimens'] = element[1]['specimens']
-    sample['phylogenetic_tree'] = dict()
+    sample['organism'] = element[1]['specimens'][0]['organism']['text']
+    sample['commonName'] = element[1]['specimens'][0]['commonName']
+    sample['currentStatus'] = 'Submitted to BioSamples'
 
+    sample['experiment'], sample['assemblies'] = parse_data_records(element[1]['specimens'])
+    sample['records'] = element[1]['specimens']
+
+    sample['taxonomies'] = dict()
     # adding phylogenetic information
     response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample['tax_id']}")
     root = etree.fromstring(response.content)
     for rank in phylogenetic_ranks:
-        sample['phylogenetic_tree'][rank] = {
-            "scientific_name": 'Not specified',
-            "common_name": 'Not specified'
+        sample['taxonomies'][rank] = {
+            "scientificName": 'Other',
+            "commonName": 'Other',
+            "tax_id": None
         }
 
     try:
@@ -237,57 +235,94 @@ def final_formatting(element):
             if rank in phylogenetic_ranks:
                 scientific_name = taxon.get('scientificName')
                 common_name = taxon.get('commonName')
-                sample['phylogenetic_tree'][rank][
-                    'scientific_name'] = scientific_name if scientific_name else 'Not specified'
-                sample['phylogenetic_tree'][rank]['common_name'] = common_name if common_name else 'Not specified'
+                tax_id = taxon.get('taxId')
+                sample['taxonomies'][rank]['scientificName'] = scientific_name if scientific_name else 'Other'
+                sample['taxonomies'][rank]['commonName'] = common_name if common_name else 'Other'
+                sample['taxonomies'][rank]['tax_id'] = tax_id if tax_id else None
     except AttributeError:
-        sample['error_message'] = "Species without phylogeny"
-        return beam.pvalue.TaggedOutput('error', sample)
+        error_sample = {
+            "tax_id": sample['tax_id'],
+            "scientific_name": sample['organism'],
+            "common_name": sample['commonName']}
+        return beam.pvalue.TaggedOutput('error', error_sample)
 
     # update phylogenetic tree names
-    sample['phylogenetic_tree_scientific_names'] = list()
-    sample['phylogenetic_tree_common_names'] = list()
-    for rank in phylogenetic_ranks:
-        sample['phylogenetic_tree_scientific_names'].append(sample['phylogenetic_tree'][rank]['scientific_name'])
-        sample['phylogenetic_tree_common_names'].append(sample['phylogenetic_tree'][rank]['common_name'])
+    # sample['phylogenetic_tree_scientific_names'] = list()
+    # sample['phylogenetic_tree_common_names'] = list()
+    # for rank in phylogenetic_ranks:
+    #     sample['phylogenetic_tree_scientific_names'].append(sample['phylogenetic_tree'][rank]['scientific_name'])
+    #     sample['phylogenetic_tree_common_names'].append(sample['phylogenetic_tree'][rank]['common_name'])
 
     # symbionts and metagenomes raw data
-    sample['symbionts'] = element[1]['symbionts']
-    sample['metagenomes'] = element[1]['metagenomes']
+    sample['symbionts_experiment'], sample['symbionts_assemblies'] = parse_data_records(element[1]['symbionts'])
+    sample['symbionts_records'] = element[1]['symbionts']
+    sample['metagenomes_experiment'], sample['metagenomes_assemblies'] = parse_data_records(element[1]['metagenomes'])
+    sample['metagenomes_records'] = element[1]['metagenomes']
+    if len(sample['symbionts_records']) > 0:
+        sample['symbionts_biosamples_status'] = 'Submitted to BioSamples'
+    if len(sample['symbionts_assemblies']) > 0:
+        sample['symbionts_assemblies_status'] = 'Assemblies Submitted'
 
-    # host data
-    sample['raw_data'] = [experiment for item in element[1]['raw_data'] for experiment in item]
-    sample['assemblies'] = [assembly for item in element[1]['assemblies'] for assembly in item]
-
-    # symbionts and metagenomes data
-    sample['symbionts_raw_data'] = [experiment for item in element[1]['symbionts_raw_data'] for experiment in item]
-    sample['symbionts_assemblies'] = [assembly for item in element[1]['symbionts_assemblies'] for assembly in item]
-    sample['metagenomes_raw_data'] = [experiment for item in element[1]['metagenomes_raw_data'] for experiment in item]
-    sample['metagenomes_assemblies'] = [assembly for item in element[1]['metagenomes_assemblies'] for assembly in item]
-
-    # symbionts and metagenomes metadata status
-    sample['symbionts_status'] = 'Symbionts Submitted to BioSamples' if len(
-        sample['symbionts']) != 0 else 'Not available'
-    sample['metagenomes_status'] = 'Metagenomes Submitted to Biosamples' if len(
-        sample['metagenomes']) != 0 else 'Not available'
 
     # host data status
-    sample['current_status'] = 'Raw Data - Submitted' if len(sample['raw_data']) != 0 else sample['current_status']
-    sample['current_status'] = 'Assemblies - Submitted' if len(sample['assemblies']) != 0 else sample['current_status']
+    sample['currentStatus'] = 'Raw Data - Submitted' if len(sample['experiment']) != 0 else sample['currentStatus']
+    sample['currentStatus'] = 'Assemblies - Submitted' if len(sample['assemblies']) != 0 else sample['currentStatus']
 
     data_portal_response = requests.get(
         f"https://portal.darwintreeoflife.org/api/root_organisms/root?id={sample['scientific_name']}").json()
     if 'annotation' in data_portal_response and len(data_portal_response['annotation']) > 0:
-        sample['current_status'] = 'Annotation Complete'
+        sample['currentStatus'] = 'Annotation Complete'
+        sample['annotation'] = data_portal_response['annotation']
 
-    # symbionts and metagenomes data status
-    sample['symbionts_status'] = 'Symbionts Raw Data - Submitted' if len(sample['symbionts_raw_data']) != 0 else sample[
-        'symbionts_status']
-    sample['symbionts_status'] = 'Symbionts Assemblies - Submitted' if len(sample['symbionts_assemblies']) != 0 else \
-    sample['symbionts_status']
-    sample['metagenomes_status'] = 'Metagenomes Raw Data - Submitted' if len(sample['metagenomes_raw_data']) != 0 else \
-    sample['metagenomes_status']
-    sample['metagenomes_status'] = 'Metagenomes Assemblies - Submitted' if len(
-        sample['metagenomes_assemblies']) != 0 else sample['metagenomes_status']
+    sample['biosamples'] = 'Done'
+    sample['annotation_status'] = 'Waiting'
+    if sample['currentStatus'] == 'Annotation Complete':
+        sample['annotation_complete'] = 'Done'
+    if len(sample['assemblies']) > 0:
+        sample['assemblies_status'] = 'Done'
+    if len(samples['experiment']) > 0:
+        sample['mapped_reads'] = 'Done'
+        sample['raw_data'] = 'Done'
+    sample['trackingSystem'] = [
+        {'name': 'biosamples', 'status': sample['biosamples'], 'rank': 1},
+        {'name': 'mapped_reads', 'status': sample['mapped_reads'], 'rank': 2},
+        {'name': 'assemblies', 'status': sample['assemblies'], 'rank': 3},
+        {'name': 'raw_data', 'status': sample['raw_data'], 'rank': 4},
+        {'name': 'annotation', 'status': sample['annotation_status'], 'rank': 5},
+        {'name': 'annotation_complete', 'status': sample['annotation_complete'], 'rank': 6}]
 
+    # TODO: collect tolids, ex. ['idBibMarc2', 'idBibMarc3', 'idBibMarc1']
+    sample['tolid'] = list()
+
+    # TODO: collect genome notes
+    sample['genome_notes'] = list()
+
+    # TODO: collect goat_info
+    sample['goat_info'] = dict()
+
+    # TODO: collect other common names
+    sample['commonNameSource'] = 'NCBI_taxon'
+
+    # TODO: collect geo coordinates
+    sample['orgGeoList'] = list()
+    sample['specGeoList'] = list()
+
+    # TODO: check tolqc links
+    sample['show_tolqc'] = False
+
+    # TODO: check for nbnatlas link
+    sample['nbnatlas'] = None
     return beam.pvalue.TaggedOutput('normal', sample)
+
+
+def parse_data_records(records):
+    experiments = list()
+    assemblies = list()
+    for record in records:
+        if 'experiments' in record:
+            experiments.extend(record['experiments'])
+            del record['experiments']
+        if 'assemblies' in record:
+            assemblies.extend(record['assemblies'])
+            del record['assemblies']
+    return experiments, assemblies

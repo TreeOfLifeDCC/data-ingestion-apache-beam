@@ -12,7 +12,9 @@ from apache_beam.runners import DataflowRunner, DirectRunner
 from dependencies.samples_schema import samples_schema
 from dependencies.checklist_errors_schema import checklist_errors_schema
 from dependencies.symbionts_metagenomes_errors_schema import symbionts_metagenomes_errors_schema
-from dependencies.common_functions import (classify_samples, process_specimens_for_data_portal, process_records_for_dwh)
+from dependencies.data_portal_errors_schema import data_portal_errors_schema
+from dependencies.common_functions import (classify_samples, process_specimens_for_data_portal, process_records_for_dwh,
+                                           final_formatting)
 
 # Command line arguments
 parser = argparse.ArgumentParser(description='Load DToL data from Json into BigQuery')
@@ -114,8 +116,15 @@ results = (
         {'specimens': dwh_specimens_processing.Normal, 'symbionts': dwh_symbionts_processing.Normal,
          'metagenomes': dwh_metagenomes_processing.Normal}
         | beam.CoGroupByKey()
-        | "Write to gs" >> beam.io.WriteToText(output_path)
+        | beam.Map(final_formatting)
 )
 
+results.normal | "Write to gs" >> beam.io.WriteToText(output_path)
+results.error | "Write phylogenetic issues to BigQuery" >> beam.io.WriteToBigQuery(
+    table='prj-ext-prod-dtol-gcp-dr:dtol.phylogenetic_errors',
+    schema=data_portal_errors_schema,
+    create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
+    write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
+)
 
 p.run()
