@@ -49,7 +49,7 @@ input_data = (
         p
         | "Read data from JSON file" >> beam.io.ReadFromText(input)
         | "ParseJson" >> beam.Map(lambda sample: json.loads(sample))
-        | "Classify samples" >> beam.ParDo(classify_samples).with_outputs(
+        | "Classify samples" >> beam.Map(classify_samples).with_outputs(
     "Errors", "Symbionts", "Metagenomes", main="Specimens")
 )
 
