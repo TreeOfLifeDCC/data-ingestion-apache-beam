@@ -280,7 +280,7 @@ def final_formatting(element):
         sample['annotation_complete'] = 'Done'
     if len(sample['assemblies']) > 0:
         sample['assemblies_status'] = 'Done'
-    if len(samples['experiment']) > 0:
+    if len(sample['experiment']) > 0:
         sample['mapped_reads'] = 'Done'
         sample['raw_data'] = 'Done'
     sample['trackingSystem'] = [
