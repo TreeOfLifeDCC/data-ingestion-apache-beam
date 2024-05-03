@@ -11,18 +11,18 @@ def classify_samples(sample):
         if checklist in SPECIMENS_SYMBIONTS_CHECKLISTS:
             if ("symbiont" in sample["characteristics"]
                     and sample["characteristics"]["symbiont"][0]["text"] == "Y"):
-                yield beam.pvalue.TaggedOutput("Symbionts", sample)
+                return beam.pvalue.TaggedOutput("Symbionts", sample)
             else:
-                yield sample
+                return sample
         elif checklist in METAGENOMES_CHECKLISTS:
-            yield beam.pvalue.TaggedOutput("Metagenomes", sample)
+            return beam.pvalue.TaggedOutput("Metagenomes", sample)
         else:
-            yield beam.pvalue.TaggedOutput("Errors", {
+            return beam.pvalue.TaggedOutput("Errors", {
                 "biosample_id": sample["accession"],
                 "checklist": checklist
             })
     except KeyError:
-        yield beam.pvalue.TaggedOutput("Errors", {
+        return beam.pvalue.TaggedOutput("Errors", {
             "biosample_id": sample["accession"],
             "checklist": "wasn't found"
         })
@@ -75,7 +75,7 @@ def process_specimens_for_data_portal(sample):
             "unit": units,
             "ontology_term": ontology_terms
         })
-    yield data_portal_record
+    return data_portal_record
 
 
 # Processing for symbionts
