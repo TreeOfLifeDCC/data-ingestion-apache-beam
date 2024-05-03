@@ -5,7 +5,10 @@ from lxml import etree
 SPECIMENS_SYMBIONTS_CHECKLISTS = ["ERC000011", "ERC000053"]
 METAGENOMES_CHECKLISTS = ["ERC000013", "ERC000024", "ERC000025", "ERC000047", "ERC000050"]
 
+
 def classify_samples(sample):
+    error_sample = dict()
+    error_sample['biosample_id'] = sample["accession"]
     try:
         checklist = sample["characteristics"]["ENA-CHECKLIST"][0]["text"]
         if checklist in SPECIMENS_SYMBIONTS_CHECKLISTS:
@@ -17,15 +20,11 @@ def classify_samples(sample):
         elif checklist in METAGENOMES_CHECKLISTS:
             return beam.pvalue.TaggedOutput("Metagenomes", sample)
         else:
-            return beam.pvalue.TaggedOutput("Errors", {
-                "biosample_id": sample["accession"],
-                "checklist": checklist
-            })
+            error_sample['checklist'] = checklist
+            return beam.pvalue.TaggedOutput("Errors", error_sample)
     except KeyError:
-        return beam.pvalue.TaggedOutput("Errors", {
-            "biosample_id": sample["accession"],
-            "checklist": "wasn't found"
-        })
+        error_sample['checklist'] = "Wasn't found"
+        return beam.pvalue.TaggedOutput("Errors", error_sample)
 
 
 
