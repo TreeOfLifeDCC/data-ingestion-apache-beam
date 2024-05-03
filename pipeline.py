@@ -116,7 +116,7 @@ results = (
         {'specimens': dwh_specimens_processing.Normal, 'symbionts': dwh_symbionts_processing.Normal,
          'metagenomes': dwh_metagenomes_processing.Normal}
         | beam.CoGroupByKey()
-        | beam.Map(final_formatting)
+        | beam.Map(final_formatting).with_outputs()
 )
 
 results.normal | "Write to gs" >> beam.io.WriteToText(output_path)
