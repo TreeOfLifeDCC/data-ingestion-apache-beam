@@ -42,6 +42,7 @@ options.view_as(StandardOptions).runner = opts.runner
 
 # Static input and output
 input = f'gs://{opts.project}/dtol_data.jsonl'
+output_path = f'gs://{opts.project}/output.txt'
 
 
 p = beam.Pipeline(options=options)
@@ -109,99 +110,12 @@ dwh_metagenomes_processing.Errors | "Write metagenomes errors to BigQuery" >> be
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
 )
 
-# symbionts_processing = (
-#         symbionts_collection
-#         | "Create symbionts tuple" >> beam.Map(process_symbiont).with_outputs(
-#     "DWHSymbionts", main="DataPortalSymbionts")
-# )
-#
-# metagenomes_processing = (
-#         metagenomes_collection
-#         | "Create metagenomes tuple" >> beam.Map(process_metagenomes).with_outputs(
-#     "DWHMetagenomes", main="DataPortalMetagenomes")
-# )
+results = (
+        {'specimens': dwh_specimens_processing.Normal, 'symbionts': dwh_symbionts_processing.Normal,
+         'metagenomes': dwh_metagenomes_processing.Normal}
+        | beam.CoGroupByKey()
+        | "Write to gs" >> beam.io.WriteToText(output_path)
+)
 
-# organisms_raw_data = (
-#         organisms_collection
-#         | "Get raw data for organisms" >> beam.Map(get_reads)
-# )
-#
-# specimens_raw_data = (
-#         specimens_collection
-#         | "Get raw data for specimens" >> beam.Map(get_reads)
-# )
-
-# organisms_assemblies = (
-#         organisms_collection
-#         | "Get assemblies for organisms" >> beam.Map(parse_assemblies)
-# )
-#
-# specimens_assemblies = (
-#         specimens_collection
-#         | "Get assemblies for specimens" >> beam.Map(parse_assemblies)
-# )
-
-# raw_data = (
-#         (organisms_raw_data, specimens_raw_data)
-#         | "Flatten organisms and specimens raw data" >> beam.Flatten()
-#         | "Group organisms and specimens raw data" >> beam.GroupByKey()
-#         | "Merge records into one list" >> beam.Map(merge_data_records)
-# )
-#
-# assemblies = (
-#         (organisms_assemblies, specimens_assemblies)
-#         | "Flatten organisms and specimens assemblies" >> beam.Flatten()
-#         | "Group organisms and specimens assemblies" >> beam.GroupByKey()
-#         | "Merge assemblies into one list" >> beam.Map(merge_data_records)
-# )
-#
-# symbionts_raw_data = (
-#         symbionts_processing
-#         | "Get raw data for symbionts" >> beam.Map(get_reads)
-# )
-#
-# symbionts_assemblies = (
-#         symbionts_processing
-#         | "Get assemblies for symbionts" >> beam.Map(parse_assemblies)
-# )
-
-# metagenomes_raw_data = (
-#         metagenomes_processing
-#         | "Get raw data for metagenomes" >> beam.Map(get_reads)
-# )
-#
-# metagenomes_assemblies = (
-#         metagenomes_processing
-#         | "Get assemblies for metagenomes" >> beam.Map(parse_assemblies)
-# )
-
-# results = (
-#         {'specimens': specimens_processing,
-#          'symbionts': symbionts_processing, 'metagenomes': metagenomes_processing,
-#          'raw_data': raw_data, 'assemblies': assemblies,
-#          'symbionts_raw_data': symbionts_raw_data,
-#          'symbionts_assemblies': symbionts_assemblies,
-#          'metagenomes_raw_data': metagenomes_raw_data,
-#          'metagenomes_assemblies': metagenomes_assemblies}
-#         | beam.CoGroupByKey()
-#         | "Final formatting" >> beam.Map(final_formatting).with_outputs()
-# )
-#
-# normal_results = results.normal
-# error_results = results.error
-
-# normal_results | "Write to BigQuery" >> beam.io.WriteToBigQuery(
-#     'prj-ext-prod-dtol-gcp-dr:dtol.dwh',
-#     schema=table_schema,
-#     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-#     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
-# )
-
-# error_results | "Write errors to BigQuery" >> beam.io.WriteToBigQuery(
-#     'prj-ext-prod-dtol-gcp-dr:dtol.dwh_errors',
-#     schema=error_table_schema,
-#     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-#     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
-# )
 
 p.run()
