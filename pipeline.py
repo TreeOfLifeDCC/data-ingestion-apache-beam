@@ -94,7 +94,7 @@ dwh_symbionts_processing = (
 
 dwh_metagenomes_processing = (
     metagenomes_collection
-    | "Create dwh metagenomes records tupe" >> beam.Map(process_records_for_dwh, "metagenomes").with_outputs(
+    | "Create dwh metagenomes records tuple" >> beam.Map(process_records_for_dwh, "metagenomes").with_outputs(
     "Errors", main="Normal")
 )
 
