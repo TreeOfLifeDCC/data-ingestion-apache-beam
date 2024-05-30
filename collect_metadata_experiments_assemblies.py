@@ -1,13 +1,21 @@
 import requests
 import json
+import argparse
 
 from collections import defaultdict
 from dependencies.samples_schema import samples_schema
 
-STUDY_ID = "PRJEB40665"
 EXPERIMENTS = defaultdict(list)
 ASSEMBLIES = defaultdict(list)
 SAMPLES = dict()
+
+parser = argparse.ArgumentParser(description='Collect metadata, experiments and assemblies')
+parser.add_argument('--study_id', required=True, help='Specify Project ENA study id')
+parser.add_argument('--project', required=True, help='Specify Project tag for BioSamples search')
+opts = parser.parse_args()
+
+STUDY_ID = opts.study_id
+PROJECT_TAG = opts.project
 
 
 def main():
@@ -41,7 +49,7 @@ def main():
 
     # collect metadata from the BioSamples
     # TODO: consider using AsyncIO to improve the speed
-    first_url = "https://www.ebi.ac.uk/biosamples/samples?size=200&filter=attr%3Aproject%20name%3ADTOL"
+    first_url = f"https://www.ebi.ac.uk/biosamples/samples?size=200&filter=attr%3Aproject%20name%3A{PROJECT_TAG}"
     samples_response = requests.get(first_url).json()
     while '_embedded' in samples_response:
         for sample in samples_response['_embedded']['samples']:
@@ -72,7 +80,7 @@ def main():
         SAMPLES[sample_id] = record
 
     # write results in the jsonl format
-    with open("dtol_data.jsonl", "w") as f:
+    with open("metadata_experiments_assemblies.jsonl", "w") as f:
         for sample_id, record in SAMPLES.items():
             f.write(f"{json.dumps(record)}\n")
 

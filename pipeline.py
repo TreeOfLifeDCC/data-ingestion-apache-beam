@@ -19,6 +19,7 @@ from dependencies.common_functions import (classify_samples, process_specimens_f
 # Command line arguments
 parser = argparse.ArgumentParser(description='Load DToL data from Json into BigQuery')
 parser.add_argument('--project', required=True, help='Specify Google Cloud project')
+parser.add_argument('--bq_dataset_name', required=True, help='BigQuery dataset name')
 parser.add_argument('--region', required=True, help='Specify Google Cloud region')
 parser.add_argument('--stagingLocation', required=True, help='Specify Cloud Storage bucket for staging')
 parser.add_argument('--tempLocation', required=True, help='Specify Cloud Storage bucket for temp')
@@ -43,8 +44,9 @@ options.view_as(GoogleCloudOptions).job_name = '{0}{1}'.format('my-pipeline-', t
 options.view_as(StandardOptions).runner = opts.runner
 
 # Static input and output
-input = f'gs://{opts.project}/dtol_data.jsonl'
+input = f'gs://{opts.project}/metadata_experiments_assemblies.jsonl'
 output_path = f'gs://{opts.project}/output.txt'
+bq_dataset_name = opts.bq_dataset_name
 
 
 p = beam.Pipeline(options=options)
@@ -68,13 +70,13 @@ data_portal_specimens_processing = (
 )
 
 data_portal_specimens_processing | "Write to BigQuery" >> beam.io.WriteToBigQuery(
-    table='prj-ext-prod-dtol-gcp-dr:dtol.specimens',
+    table=f'{opts.project}:{bq_dataset_name}.specimens',
     schema=samples_schema,
     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
 )
 errors_collection | "Write to Errors BigQuery" >> beam.io.WriteToBigQuery(
-    table='prj-ext-prod-dtol-gcp-dr:dtol.checklist_errors',
+    table=f'{opts.project}:{bq_dataset_name}.checklist_errors',
     schema=checklist_errors_schema,
     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
@@ -99,14 +101,14 @@ dwh_metagenomes_processing = (
 )
 
 dwh_symbionts_processing.Errors | "Write symbionts errors to BigQuery" >> beam.io.WriteToBigQuery(
-    table='prj-ext-prod-dtol-gcp-dr:dtol.symbionts_errors',
+    table=f'{opts.project}:{bq_dataset_name}.symbionts_errors',
     schema=symbionts_metagenomes_errors_schema,
     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
 )
 
 dwh_metagenomes_processing.Errors | "Write metagenomes errors to BigQuery" >> beam.io.WriteToBigQuery(
-    table='prj-ext-prod-dtol-gcp-dr:dtol.metagenomes_errors',
+    table=f'{opts.project}:{bq_dataset_name}.metagenomes_errors',
     schema=symbionts_metagenomes_errors_schema,
     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
@@ -121,7 +123,7 @@ results = (
 
 results.normal | "Write to gs" >> beam.io.WriteToText(output_path)
 results.error | "Write phylogenetic issues to BigQuery" >> beam.io.WriteToBigQuery(
-    table='prj-ext-prod-dtol-gcp-dr:dtol.phylogenetic_errors',
+    table=f'{opts.project}:{bq_dataset_name}.phylogenetic_errors',
     schema=data_portal_errors_schema,
     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
