@@ -329,7 +329,7 @@ def final_formatting(element):
     for specimen in element[1]['specimens']:
         sample['tolid'].append(specimen['tolid'])
         tmp = dict()
-        tmp['organism'] = specimen['organism'][0]['text']
+        tmp['organism'] = specimen['organism']['text']
         tmp['accession'] = specimen['accession']
         tmp['commonName'] = specimen['commonName']
         tmp['sex'] = specimen['sex']
