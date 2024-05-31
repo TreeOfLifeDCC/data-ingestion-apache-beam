@@ -351,6 +351,7 @@ def final_formatting(element):
     sample['commonNameSource'] = 'NCBI_taxon'
     if 'commonName' in data_portal_response:
         sample['commonName'] = data_portal_response['commonName']
+    if 'commonNameSource' in data_portal_response:
         sample['commonNameSource'] = data_portal_response['commonNameSource']
 
     sample['show_tolqc'] = False
