@@ -326,7 +326,7 @@ def final_formatting(element):
     sample['trackingSystem'] = [
         {'name': 'biosamples', 'status': sample['biosamples'], 'rank': 1},
         {'name': 'mapped_reads', 'status': sample['mapped_reads'], 'rank': 2},
-        {'name': 'assemblies', 'status': sample['assemblies'], 'rank': 3},
+        {'name': 'assemblies', 'status': sample['assemblies_status'], 'rank': 3},
         {'name': 'raw_data', 'status': sample['raw_data'], 'rank': 4},
         {'name': 'annotation', 'status': sample['annotation_status'], 'rank': 5},
         {'name': 'annotation_complete', 'status': sample['annotation_complete'], 'rank': 6}]
