@@ -74,6 +74,30 @@ def process_records_for_dwh(sample, sample_type):
     except KeyError:
         dwh_record['organismPart'] = None
 
+    try:
+        tolid, _, _ = check_field_existence(sample['characteristics']['tolid'])
+        dwh_record['tolid'] = tolid
+    except KeyError:
+        dwh_record['tolid'] = None
+
+    try:
+        lat, _, _ = check_field_existence(sample['characteristics']['geographic location (latitude)'])
+        dwh_record['lat'] = lat
+    except KeyError:
+        dwh_record['lat'] = None
+
+    try:
+        lon, _, _ = check_field_existence(sample['characteristics']['geographic location (longitude)'])
+        dwh_record['lon'] = lon
+    except KeyError:
+        dwh_record['lon'] = None
+
+    try:
+        locality, _, _ = check_field_existence(sample['characteristics']['geographic location (region and locality)'])
+        dwh_record['locality'] = locality
+    except KeyError:
+        dwh_record['locality'] = None
+
     if "experiments" in sample and len(sample["experiments"]) > 0:
         dwh_record["trackingSystem"] = "Raw Data - Submitted"
     elif "assemblies" in sample and len(sample["assemblies"]) > 0:
@@ -298,27 +322,45 @@ def final_formatting(element):
         {'name': 'annotation', 'status': sample['annotation_status'], 'rank': 5},
         {'name': 'annotation_complete', 'status': sample['annotation_complete'], 'rank': 6}]
 
-    # TODO: collect tolids, ex. ['idBibMarc2', 'idBibMarc3', 'idBibMarc1']
     sample['tolid'] = list()
-
-    # TODO: collect genome notes
-    sample['genome_notes'] = list()
-
-    # TODO: collect goat_info
-    sample['goat_info'] = dict()
-
-    # TODO: collect other common names
-    sample['commonNameSource'] = 'NCBI_taxon'
-
     # TODO: collect geo coordinates
     sample['orgGeoList'] = list()
     sample['specGeoList'] = list()
+    for specimen in element[1]['specimens']:
+        sample['tolid'].append(specimen['tolid'])
+        tmp = dict()
+        tmp['organism'] = specimen['organism']
+        tmp['accession'] = specimen['accession']
+        tmp['commonName'] = specimen['commonName']
+        tmp['sex'] = specimen['sex']
+        tmp['organismPart'] = specimen['organismPart']
+        tmp['lat'] = specimen['lat']
+        tmp['lng'] = specimen['lon']
+        tmp['locality'] = specimen['locality']
+        sample['orgGeoList'].append(tmp)
 
-    # TODO: check tolqc links
+    sample['genome_notes'] = list()
+    if 'genome_notes' in data_portal_response and len(data_portal_response['genome_notes']) > 0:
+        sample['genome_notes'] = data_portal_response['genome_notes']
+
+    sample['goat_info'] = dict()
+    if 'goat_info' in data_portal_response:
+        sample['goat_info'] = data_portal_response['goat_info']
+
+    # TODO: collect other common names
+    sample['commonNameSource'] = 'NCBI_taxon'
+    if 'commonName' in data_portal_response:
+        sample['commonName'] = data_portal_response['commonName']
+        sample['commonNameSource'] = data_portal_response['commonNameSource']
+
     sample['show_tolqc'] = False
+    if 'show_tolqc' in data_portal_response:
+        sample['show_tolqc'] = data_portal_response['show_tolqc']
 
-    # TODO: check for nbnatlas link
     sample['nbnatlas'] = None
+    if 'nbnatlas' in data_portal_response:
+        sample['nbnatlas'] = data_portal_response['nbnatlas']
+
     return beam.pvalue.TaggedOutput('normal', sample)
 
 
