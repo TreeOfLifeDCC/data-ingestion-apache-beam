@@ -105,6 +105,9 @@ def process_records_for_dwh(sample, sample_type):
     else:
         dwh_record["trackingSystem"] = "Submitted to BioSamples"
 
+    dwh["experiments"] = sample["experiments"]
+    dwh["assemblies"] = sample["assemblies"]
+
     if sample_type == 'specimens':
         return sample['taxId'], dwh_record
     elif sample_type == "symbionts":
@@ -322,12 +325,12 @@ def final_formatting(element):
         {'name': 'annotation', 'status': sample['annotation_status'], 'rank': 5},
         {'name': 'annotation_complete', 'status': sample['annotation_complete'], 'rank': 6}]
 
-    sample['tolid'] = list()
+    sample['tolid'] = set()
     # TODO: collect geo coordinates
     sample['orgGeoList'] = list()
     sample['specGeoList'] = list()
     for specimen in element[1]['specimens']:
-        sample['tolid'].append(specimen['tolid'])
+        sample['tolid'].add(specimen['tolid'])
         tmp = dict()
         tmp['organism'] = specimen['organism']['text']
         tmp['accession'] = specimen['accession']
@@ -338,6 +341,7 @@ def final_formatting(element):
         tmp['lng'] = specimen['lon']
         tmp['locality'] = specimen['locality']
         sample['orgGeoList'].append(tmp)
+    sample['tolid'] = list(sample['tolid'])
 
     sample['genome_notes'] = list()
     if 'genome_notes' in data_portal_response and len(data_portal_response['genome_notes']) > 0:
