@@ -106,13 +106,13 @@ def process_records_for_dwh(sample, sample_type):
         dwh_record["trackingSystem"] = "Submitted to BioSamples"
 
     try:
-        dwh["experiments"] = sample["experiments"]
+        dwh_record["experiments"] = sample["experiments"]
     except KeyError:
-        dwh["experiments"] = list()
+        dwh_record["experiments"] = list()
     try:
-        dwh["assemblies"] = sample["assemblies"]
+        dwh_record["assemblies"] = sample["assemblies"]
     except KeyError:
-        dwh["assemblies"] = list()
+        dwh_record["assemblies"] = list()
 
     if sample_type == 'specimens':
         return sample['taxId'], dwh_record
