@@ -36,14 +36,12 @@ def parse_annotations(sample):
             data = line.rstrip().decode("utf-8").split("\t")
             record["type"] = data[2]
             for item in data[-1].split(";"):
-                name, value = item.split()
-                if name and value:
+                if item:
+                    name, value = item.split()
                     record[name] = value
             sample_to_return["annotations"].append(record)
 
     return sample_to_return
-
-
 
 
 def classify_samples(sample):
