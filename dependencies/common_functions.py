@@ -1,5 +1,8 @@
 import requests
+import gzip
 import apache_beam as beam
+from urllib.request import urlretrieve
+from collections import defaultdict
 from lxml import etree
 
 PHYLOGENETIC_RANKS = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species')
@@ -22,6 +25,22 @@ def parse_annotations(sample):
                 sample[rank] = scientific_name if scientific_name else 'Not specified'
     except AttributeError:
         pass
+    sample["annotations"] = list()
+    filename = sample['link'].split("/")[-1]
+    urlretrieve(sample['link'], filename)
+    with gzip.open(filename, 'rb') as f:
+        for _ in range(5):
+            next(f)
+        for line in f:
+            record = dict()
+            data = line.rstrip().decode("utf-8").split("\t")
+            record["type"] = data[2]
+            for item in data[-1].split(";"):
+                name, value = item.split()
+                if name and value:
+                    record[name] = value
+            sample["annotations"].append(record)
+
     return sample
 
 
