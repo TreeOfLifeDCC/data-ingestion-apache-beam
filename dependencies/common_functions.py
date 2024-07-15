@@ -17,7 +17,7 @@ def parse_annotations(sample):
     try:
         for taxon in root.find('taxon').find('lineage').findall('taxon'):
             rank = taxon.get('rank')
-            if rank in phylogenetic_ranks:
+            if rank in PHYLOGENETIC_RANKS:
                 scientific_name = taxon.get('scientificName')
                 sample[rank] = scientific_name if scientific_name else 'Not specified'
     except AttributeError:
