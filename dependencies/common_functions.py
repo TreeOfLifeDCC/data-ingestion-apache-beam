@@ -22,10 +22,10 @@ def parse_annotations(sample):
             rank = taxon.get('rank')
             if rank in PHYLOGENETIC_RANKS:
                 scientific_name = taxon.get('scientificName')
-                sample[rank] = scientific_name if scientific_name else 'Not specified'
+                sample_to_return[rank] = scientific_name if scientific_name else None
     except AttributeError:
         pass
-    sample["annotations"] = list()
+    sample_to_return["annotations"] = list()
     filename = sample['link'].split("/")[-1]
     urlretrieve(sample['link'], filename)
     with gzip.open(filename, 'rb') as f:
@@ -39,9 +39,9 @@ def parse_annotations(sample):
                 name, value = item.split()
                 if name and value:
                     record[name] = value
-            sample["annotations"].append(record)
+            sample_to_return["annotations"].append(record)
 
-    return sample
+    return sample_to_return
 
 
 
