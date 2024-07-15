@@ -26,6 +26,7 @@ def parse_annotations(sample):
     # except AttributeError:
     #     pass
     sample_to_return["record_type"] = sample["record_type"]
+    sample_to_return["accession"] = sample["accession"]
     info = sample["info"].split(";")
     for item in info:
         if item:

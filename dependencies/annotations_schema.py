@@ -41,6 +41,11 @@ annotations_schema = {
         #     "mode": "NULLABLE"
         # },
         {
+            "name": "accession",
+            "type": "STRING",
+            "mode": "REQUIRED",
+        },
+        {
             "name": "record_type",
             "type": "STRING",
             "mode": "NULLABLE"
