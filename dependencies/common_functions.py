@@ -2,8 +2,29 @@ import requests
 import apache_beam as beam
 from lxml import etree
 
-SPECIMENS_SYMBIONTS_CHECKLISTS = ["ERC000011", "ERC000053"]
-METAGENOMES_CHECKLISTS = ["ERC000013", "ERC000024", "ERC000025", "ERC000047", "ERC000050"]
+PHYLOGENETIC_RANKS = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species')
+
+
+def parse_annotations(sample):
+    sample_to_return = dict()
+    response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample['accession']}")
+    root = etree.fromstring(response.content)
+    sample_to_return['tax_id'] = root.find("ASSEMBLY").find("TAXON").find("TAXON_ID").text
+    for rank in PHYLOGENETIC_RANKS:
+        sample_to_return[rank] = None
+    response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample_to_return['tax_id']}")
+    root = etree.fromstring(response.content)
+    try:
+        for taxon in root.find('taxon').find('lineage').findall('taxon'):
+            rank = taxon.get('rank')
+            if rank in phylogenetic_ranks:
+                scientific_name = taxon.get('scientificName')
+                sample[rank] = scientific_name if scientific_name else 'Not specified'
+    except AttributeError:
+        pass
+    return sample
+
+
 
 
 def classify_samples(sample):
@@ -27,7 +48,7 @@ def classify_samples(sample):
         return beam.pvalue.TaggedOutput("Errors", error_sample)
 
 
-def check_field_existence(record):
+def check_fieldxistence(record):
     values = list()
     units = list()
     ontology_terms = list()
