@@ -7,125 +7,118 @@ annotations_schema = {
         },
         {
             "name": "kingdom",
-            "type": "string",
+            "type": "STRING",
             "mode": "NULLABLE"
         },
         {
             "name": "phylum",
-            "type": "string",
+            "type": "STRING",
             "mode": "NULLABLE"
         },
         {
             "name": "class",
-            "type": "string",
+            "type": "STRING",
             "mode": "NULLABLE"
         },
         {
             "name": "order",
-            "type": "string",
+            "type": "STRING",
             "mode": "NULLABLE"
         },
         {
             "name": "family",
-            "type": "string",
+            "type": "STRING",
             "mode": "NULLABLE"
         },
         {
             "name": "genus",
-            "type": "string",
+            "type": "STRING",
             "mode": "NULLABLE"
         },
         {
             "name": "species",
-            "type": "string",
+            "type": "STRING",
             "mode": "NULLABLE"
         },
         {
-            "name": "annotations",
-            "type": "RECORD",
-            "mode": "REPEATED",
-            "fields": [
-                {
-                    "name": "type",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "gene_id",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "gene_version",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "gene_source",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "gene_biotype",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "transcript_id",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "transcript_version",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "transcript_source",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "transcript_biotype",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "tag",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "exon_number",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "exon_id",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "exon_version",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "protein_id",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "protein_version",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                },
-                {
-                    "name": "gene_name",
-                    "type": "string",
-                    "mode": "NULLABLE"
-                }
-            ]
+            "name": "record_type",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "gene_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "gene_version",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "gene_source",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "gene_biotype",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "transcript_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "transcript_version",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "transcript_source",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "transcript_biotype",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "tag",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "exon_number",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "exon_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "exon_version",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "protein_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "protein_version",
+            "type": "STRING",
+            "mode": "NULLABLE"
+        },
+        {
+            "name": "gene_name",
+            "type": "STRING",
+            "mode": "NULLABLE"
         }
     ]
 }

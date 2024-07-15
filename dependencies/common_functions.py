@@ -25,22 +25,12 @@ def parse_annotations(sample):
                 sample_to_return[rank] = scientific_name if scientific_name else None
     except AttributeError:
         pass
-    sample_to_return["annotations"] = list()
-    filename = sample['link'].split("/")[-1]
-    urlretrieve(sample['link'], filename)
-    with gzip.open(filename, 'rb') as f:
-        for _ in range(5):
-            next(f)
-        for line in f:
-            record = dict()
-            data = line.rstrip().decode("utf-8").split("\t")
-            record["type"] = data[2]
-            for item in data[-1].split(";"):
-                if item:
-                    name, value = item.split()
-                    record[name] = value
-            sample_to_return["annotations"].append(record)
-
+    sample_to_return["record_type"] = sample["record_type"]
+    info = sample["info"].split(";")
+    for item in info:
+        if item:
+            k, v = item.split()
+            sample_to_return[k] = v.replace('"', '')
     return sample_to_return
 
 

@@ -39,8 +39,7 @@ options.view_as(GoogleCloudOptions).job_name = '{0}{1}'.format('my-pipeline-', t
 options.view_as(StandardOptions).runner = opts.runner
 
 # Static input and output
-input = f'gs://{opts.project}/annotations_to_import.json'
-output_path = f'gs://{opts.project}/output.txt'
+input = f'gs://{opts.project}/annotations*.jsonl'
 bq_dataset_name = opts.bq_dataset_name
 
 p = beam.Pipeline(options=options)
