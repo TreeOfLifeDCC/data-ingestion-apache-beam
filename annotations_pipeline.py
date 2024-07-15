@@ -58,3 +58,5 @@ input_data | "Write annotations to BigQuery" >> beam.io.WriteToBigQuery(
     create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
     write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE
 )
+
+p.run()
