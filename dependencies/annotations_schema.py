@@ -1,45 +1,45 @@
 annotations_schema = {
     "fields": [
-        {
-            "name": "tax_id",
-            "type": "STRING",
-            "mode": "REQUIRED"
-        },
-        {
-            "name": "kingdom",
-            "type": "STRING",
-            "mode": "NULLABLE"
-        },
-        {
-            "name": "phylum",
-            "type": "STRING",
-            "mode": "NULLABLE"
-        },
-        {
-            "name": "class",
-            "type": "STRING",
-            "mode": "NULLABLE"
-        },
-        {
-            "name": "order",
-            "type": "STRING",
-            "mode": "NULLABLE"
-        },
-        {
-            "name": "family",
-            "type": "STRING",
-            "mode": "NULLABLE"
-        },
-        {
-            "name": "genus",
-            "type": "STRING",
-            "mode": "NULLABLE"
-        },
-        {
-            "name": "species",
-            "type": "STRING",
-            "mode": "NULLABLE"
-        },
+        # {
+        #     "name": "tax_id",
+        #     "type": "STRING",
+        #     "mode": "REQUIRED"
+        # },
+        # {
+        #     "name": "kingdom",
+        #     "type": "STRING",
+        #     "mode": "NULLABLE"
+        # },
+        # {
+        #     "name": "phylum",
+        #     "type": "STRING",
+        #     "mode": "NULLABLE"
+        # },
+        # {
+        #     "name": "class",
+        #     "type": "STRING",
+        #     "mode": "NULLABLE"
+        # },
+        # {
+        #     "name": "order",
+        #     "type": "STRING",
+        #     "mode": "NULLABLE"
+        # },
+        # {
+        #     "name": "family",
+        #     "type": "STRING",
+        #     "mode": "NULLABLE"
+        # },
+        # {
+        #     "name": "genus",
+        #     "type": "STRING",
+        #     "mode": "NULLABLE"
+        # },
+        # {
+        #     "name": "species",
+        #     "type": "STRING",
+        #     "mode": "NULLABLE"
+        # },
         {
             "name": "record_type",
             "type": "STRING",

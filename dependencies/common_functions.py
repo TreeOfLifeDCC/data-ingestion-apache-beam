@@ -10,21 +10,21 @@ PHYLOGENETIC_RANKS = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus', 
 
 def parse_annotations(sample):
     sample_to_return = dict()
-    response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample['accession']}")
-    root = etree.fromstring(response.content)
-    sample_to_return['tax_id'] = root.find("ASSEMBLY").find("TAXON").find("TAXON_ID").text
-    for rank in PHYLOGENETIC_RANKS:
-        sample_to_return[rank] = None
-    response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample_to_return['tax_id']}")
-    root = etree.fromstring(response.content)
-    try:
-        for taxon in root.find('taxon').find('lineage').findall('taxon'):
-            rank = taxon.get('rank')
-            if rank in PHYLOGENETIC_RANKS:
-                scientific_name = taxon.get('scientificName')
-                sample_to_return[rank] = scientific_name if scientific_name else None
-    except AttributeError:
-        pass
+    # response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample['accession']}")
+    # root = etree.fromstring(response.content)
+    # sample_to_return['tax_id'] = root.find("ASSEMBLY").find("TAXON").find("TAXON_ID").text
+    # for rank in PHYLOGENETIC_RANKS:
+    #     sample_to_return[rank] = None
+    # response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample_to_return['tax_id']}")
+    # root = etree.fromstring(response.content)
+    # try:
+    #     for taxon in root.find('taxon').find('lineage').findall('taxon'):
+    #         rank = taxon.get('rank')
+    #         if rank in PHYLOGENETIC_RANKS:
+    #             scientific_name = taxon.get('scientificName')
+    #             sample_to_return[rank] = scientific_name if scientific_name else None
+    # except AttributeError:
+    #     pass
     sample_to_return["record_type"] = sample["record_type"]
     info = sample["info"].split(";")
     for item in info:
