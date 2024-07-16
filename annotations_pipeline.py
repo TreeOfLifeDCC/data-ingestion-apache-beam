@@ -30,11 +30,11 @@ options.view_as(GoogleCloudOptions).project = opts.project
 options.view_as(GoogleCloudOptions).region = opts.region
 options.view_as(GoogleCloudOptions).staging_location = opts.stagingLocation
 options.view_as(GoogleCloudOptions).temp_location = opts.tempLocation
-options.view_as(WorkerOptions).max_num_workers = 32
+options.view_as(WorkerOptions).max_num_workers = 64
 options.view_as(WorkerOptions).disk_size_gb = int(opts.disk_size_gb)
 options.view_as(WorkerOptions).machine_type = opts.machine_type
 options.view_as(SetupOptions).save_main_session = True
-options.view_as(SetupOptions).setup_file = '/home/alexey/data-ingestion-apache-beam/setup.py'
+options.view_as(SetupOptions).setup_file = '/Users/alexey/ebi_projects/data-ingestion-apache-beam/setup.py'
 options.view_as(GoogleCloudOptions).job_name = '{0}{1}'.format('my-pipeline-', time.time_ns())
 options.view_as(StandardOptions).runner = opts.runner
 
