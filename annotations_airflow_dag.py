@@ -65,8 +65,8 @@ APACHE_BEAM_SCRIPT = os.environ.get(
      start_date=pendulum.datetime(2024, 8, 1, tz="UTC"))
 def annotations_pipeline_dag():
     @task()
-    def parse_annotations(url, file_name):
-        print('Parsing annotations for item {}'.format(url))
+    def parse_annotations(url):
+        print('Parsing annotations for {}'.format(url))
 
         # Create an HTTP GET request
         annotations = requests.get(url)
@@ -79,28 +79,36 @@ def annotations_pipeline_dag():
 
         # Use BeautifulSoup to parse the HTML
         soup_archive = BeautifulSoup(annotations_text, 'html.parser')
-
         rows = soup_archive.find_all("tr")
 
-        annotations_to_import = open(file_name, "w")
-        for row in rows:
-            try:
-                cells = row.find_all("td")
-                links = cells[4].find_all("a")
-                link = links[0].get("href").strip()
-                accession = cells[2].text.strip()
-                record = dict()
-                record['accession'] = accession
-                record['link'] = link
-                annotations_to_import.write(f"{json.dumps(record)}\n")
-            except IndexError:
-                continue
-        annotations_to_import.close()
+        # Saving JSON as an object in GCS
+        client = storage.Client(project=GCP_PROJECT)
+        bucket = client.get_bucket(GCP_PROJECT)
+        blob = bucket.blob(f'annotations_to_import.json')
+
+        with blob.open("w") as f:
+            for row in rows:
+                try:
+                    cells = row.find_all("td")
+                    links = cells[4].find_all("a")
+                    link = links[0].get("href").strip()
+                    accession = cells[2].text.strip()
+                    record = dict()
+                    record['accession'] = accession
+                    record['link'] = link
+                    f.write(f"{json.dumps(record)}\n")
+                except IndexError:
+                    continue
+
+        return blob.name
 
     @task()
-    def annotations_to_cloud_storage(annotation_json_file):
-        with open(annotation_json_file, 'r') as f:
+    def annotations_to_cloud_storage(annotations_url_blob_name):
+        client = storage.Client(project=GCP_PROJECT)
+        bucket = client.get_bucket(GCP_PROJECT)
+        blob_annotation_urls = bucket.blob(annotations_url_blob_name)
 
+        with blob_annotation_urls.open(mode='r') as f:
             for i, line in enumerate(f):
                 print(f"Working on: {i}")
                 data = json.loads(line.rstrip())
@@ -125,41 +133,49 @@ def annotations_pipeline_dag():
 
         print('Ingesting annotations urls finished')
 
-    @task
-    def build_phylogeny_table(taxonomy_jsonl, annotation_json):
+    @task()
+    def build_phylogeny_table(annotations_url_blob_name):
         print('Building phylogeny table')
-        taxonomy = open(taxonomy_jsonl, "w")
-        with open(annotation_json, 'r') as f:
-            for i, line in enumerate(f):
-                print(f"Working on: {i}")
-                sample_to_return = dict()
-                data = json.loads(line.rstrip())
-                sample_to_return["accession"] = data["accession"]
+        client = storage.Client(project=GCP_PROJECT)
+        bucket = client.get_bucket(GCP_PROJECT)
+        blob_taxonomy = bucket.blob('taxonomy.jsonl')
 
-                response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample_to_return['accession']}")
-                root = etree.fromstring(response.content)
-                sample_to_return['tax_id'] = root.find("ASSEMBLY").find("TAXON").find("TAXON_ID").text
+        with blob_taxonomy.open(mode='w') as bt:
+            client = storage.Client(project=GCP_PROJECT)
+            bucket = client.get_bucket(GCP_PROJECT)
+            blob_annotation_urls = bucket.blob(annotations_url_blob_name)
 
-                phylogenetic_ranks = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species')
+            with blob_annotation_urls.open(mode='r') as f:
+                for i, line in enumerate(f):
+                    print(f"Working on: {i}")
+                    sample_to_return = dict()
+                    data = json.loads(line.rstrip())
+                    sample_to_return["accession"] = data["accession"]
 
-                for rank in phylogenetic_ranks:
-                    sample_to_return[rank] = None
-                response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample_to_return['tax_id']}")
-                root = etree.fromstring(response.content)
-                try:
-                    for taxon in root.find('taxon').find('lineage').findall('taxon'):
-                        rank = taxon.get('rank')
-                        if rank in phylogenetic_ranks:
-                            scientific_name = taxon.get('scientificName')
-                            sample_to_return[rank] = scientific_name if scientific_name else None
-                except AttributeError:
-                    pass
-                taxonomy.write(f"{json.dumps(sample_to_return)}\n")
-        taxonomy.close()
-        print('taxonomy json saved to {}'.format(taxonomy_jsonl))
+                    response = requests.get(
+                        f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample_to_return['accession']}")
+                    root = etree.fromstring(response.content)
+                    sample_to_return['tax_id'] = root.find("ASSEMBLY").find("TAXON").find("TAXON_ID").text
+
+                    phylogenetic_ranks = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species')
+
+                    for rank in phylogenetic_ranks:
+                        sample_to_return[rank] = None
+                    response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample_to_return['tax_id']}")
+                    root = etree.fromstring(response.content)
+                    try:
+                        for taxon in root.find('taxon').find('lineage').findall('taxon'):
+                            rank = taxon.get('rank')
+                            if rank in phylogenetic_ranks:
+                                scientific_name = taxon.get('scientificName')
+                                sample_to_return[rank] = scientific_name if scientific_name else None
+                    except AttributeError:
+                        pass
+                    bt.write(f"{json.dumps(sample_to_return)}\n")
+        print('taxonomy json saved to {}'.format(annotations_url_blob_name))
 
     run_beam_pipeline = BeamRunPythonPipelineOperator(
-        task_id="ingest_annotations_data_apache_beam",
+        task_id="GCS_to_BigQuery_Beam_pipeline",
         py_file=APACHE_BEAM_SCRIPT,
         runner=GCP_RUNNER,  # "DirectRunner",  # "DataflowRunner"
         py_options=[],
@@ -184,15 +200,11 @@ def annotations_pipeline_dag():
     )
 
     # Defining dependencies between airflow tasks
-    parse_annotations(
-        url=ANNOTATIONS_URL,
-        file_name=ANNOTATION_JSON
-    ) >> [
-        annotations_to_cloud_storage(annotation_json_file=ANNOTATION_JSON),
-        build_phylogeny_table(
-            taxonomy_jsonl=TAXONOMY_JSONL,
-            annotation_json=ANNOTATION_JSON
-        )
+    blob_annotations_name = parse_annotations(url=ANNOTATIONS_URL)
+
+    [
+        annotations_to_cloud_storage(annotations_url_blob_name=blob_annotations_name),
+        build_phylogeny_table(annotations_url_blob_name=blob_annotations_name)
     ] >> run_beam_pipeline
 
 
