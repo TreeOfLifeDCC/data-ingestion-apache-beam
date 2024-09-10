@@ -52,10 +52,6 @@ ANNOTATION_JSON = os.environ.get(
     'ANNOTATION_JSON',
     '/Users/juann/PycharmProjects/annotationsDataIngestion/annotations_to_import.json'
 )
-TAXONOMY_JSONL = os.environ.get(
-    'TAXONOMY_JSONL',
-    '/Users/juann/PycharmProjects/annotationsDataIngestion/taxonomy.jsonl'
-)
 APACHE_BEAM_SCRIPT = os.environ.get(
     'APACHE_BEAM_SCRIPT',
     '/Users/juann/PycharmProjects/annotationsDataIngestion/mock_beam_pipeline.py'
@@ -65,8 +61,8 @@ APACHE_BEAM_SCRIPT = os.environ.get(
      start_date=pendulum.datetime(2024, 8, 1, tz="UTC"))
 def annotations_pipeline_dag():
     @task()
-    def parse_annotations(url):
-        print('Parsing annotations for {}'.format(url))
+    def parse_annotations(url, json_file_name):
+        print(f'Parsing annotations urls from {url}')
 
         # Create an HTTP GET request
         annotations = requests.get(url)
@@ -84,7 +80,8 @@ def annotations_pipeline_dag():
         # Saving JSON as an object in GCS
         client = storage.Client(project=GCP_PROJECT)
         bucket = client.get_bucket(GCP_PROJECT)
-        blob = bucket.blob(f'annotations_to_import.json')
+        blob = bucket.blob(json_file_name)
+        print(f'{blob.name} storage object created.')
 
         with blob.open("w") as f:
             for row in rows:
@@ -100,6 +97,8 @@ def annotations_pipeline_dag():
                 except IndexError:
                     continue
 
+        print(f'Annotations urls saved to {blob.name}')
+
         return blob.name
 
     @task()
@@ -107,6 +106,7 @@ def annotations_pipeline_dag():
         client = storage.Client(project=GCP_PROJECT)
         bucket = client.get_bucket(GCP_PROJECT)
         blob_annotation_urls = bucket.blob(annotations_url_blob_name)
+        print(f'Ingesting annotation data from urls in blob {blob_annotation_urls.name}')
 
         with blob_annotation_urls.open(mode='r') as f:
             for i, line in enumerate(f):
@@ -131,14 +131,16 @@ def annotations_pipeline_dag():
                             record["accession"] = accession
                             output.write(f"{json.dumps(record)}\n")
 
-        print('Ingesting annotations urls finished')
+        print(f'Annotation data ingestion from {blob_annotation_urls.name} finished.')
 
-    @task()
+    @task
     def build_phylogeny_table(annotations_url_blob_name):
-        print('Building phylogeny table')
+        print(f'Building the phylogeny table for {annotations_url_blob_name}')
         client = storage.Client(project=GCP_PROJECT)
         bucket = client.get_bucket(GCP_PROJECT)
-        blob_taxonomy = bucket.blob('taxonomy.jsonl')
+        blob_taxonomy = bucket.blob(
+            f'test_{annotations_url_blob_name[-len(annotations_url_blob_name):-5]}_taxonomy.jsonl')
+        print(f'{blob_taxonomy.name} storage object created.')
 
         with blob_taxonomy.open(mode='w') as bt:
             client = storage.Client(project=GCP_PROJECT)
@@ -172,7 +174,8 @@ def annotations_pipeline_dag():
                     except AttributeError:
                         pass
                     bt.write(f"{json.dumps(sample_to_return)}\n")
-        print('taxonomy json saved to {}'.format(annotations_url_blob_name))
+
+        print(f'Phylogeny table saved to {blob_taxonomy.name}')
 
     run_beam_pipeline = BeamRunPythonPipelineOperator(
         task_id="GCS_to_BigQuery_Beam_pipeline",
@@ -200,7 +203,7 @@ def annotations_pipeline_dag():
     )
 
     # Defining dependencies between airflow tasks
-    blob_annotations_name = parse_annotations(url=ANNOTATIONS_URL)
+    blob_annotations_name = parse_annotations(url=ANNOTATIONS_URL, json_file_name=ANNOTATION_JSON)
 
     [
         annotations_to_cloud_storage(annotations_url_blob_name=blob_annotations_name),
