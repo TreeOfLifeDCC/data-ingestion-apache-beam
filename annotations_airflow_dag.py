@@ -31,7 +31,7 @@ GCP_SAVE_MAIN_SESSION = os.environ.get('GCP_SAVE_MAIN_SESSION')
 GCP_BQ_DATASET = os.environ.get('GCP_BQ_DATASET', 'annotations')
 
 ANNOTATIONS_URL = os.environ.get('ANNOTATIONS_URL', 'https://projects.ensembl.org/darwin-tree-of-life/')
-ANNOTATION_JSON = os.environ.get( 'ANNOTATION_JSON', 'annotations_to_import.json')
+ANNOTATIONS_JSON = os.environ.get( 'ANNOTATION_JSON', 'annotations_to_import.json')
 APACHE_BEAM_SCRIPT = os.environ.get(
     'APACHE_BEAM_SCRIPT',
     # Using dummy pipeline here. Actual pipeline not tested yet.
@@ -190,7 +190,7 @@ def annotations_pipeline_dag():
         runner="DirectRunner")
 
     # Defining dependencies between airflow tasks
-    blob_annotations_name = parse_annotations(url=ANNOTATIONS_URL, json_file_name=ANNOTATION_JSON)
+    blob_annotations_name = parse_annotations(url=ANNOTATIONS_URL, json_file_name=ANNOTATIONS_JSON)
 
     [
         annotations_to_cloud_storage(annotations_url_blob_name=blob_annotations_name),
