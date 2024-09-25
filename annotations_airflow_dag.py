@@ -140,12 +140,16 @@ def annotations_pipeline_dag():
                     root = etree.fromstring(response.content)
                     sample_to_return['tax_id'] = root.find("ASSEMBLY").find("TAXON").find("TAXON_ID").text
 
-                    phylogenetic_ranks = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species')
+                    phylogenetic_ranks = ('kingdom', 'phylum', 'class', 'order', 'family', 'genus')
+
+                    sample_to_return['species'] = root.find('taxon').get('scientificName')
 
                     for rank in phylogenetic_ranks:
                         sample_to_return[rank] = None
+
                     response = requests.get(f"https://www.ebi.ac.uk/ena/browser/api/xml/{sample_to_return['tax_id']}")
                     root = etree.fromstring(response.content)
+                    
                     try:
                         for taxon in root.find('taxon').find('lineage').findall('taxon'):
                             rank = taxon.get('rank')
