@@ -22,14 +22,18 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--study_id",
     required=True,
-    help="Specify Project ENA \
-                    study id",
+    help="Specify Project ENA study id",
 )
 parser.add_argument(
     "--project",
     required=True,
-    help="Specify Project tag for BioSamples \
-        search",
+    help="Specify Project tag for BioSamples search",
+)
+
+parser.add_argument(
+    "--project_name",
+    required=True,
+    help="Specify Project Name for Data Portal",
 )
 opts = parser.parse_args()
 
@@ -42,6 +46,7 @@ def main():
     Collect DToL metadata from BioSamples, experiments and assemblies
     from the ENA
     """
+    print(f"Working on {PROJECT_TAG}")
     # collect required experiments and assemblies fields
     experiment_fields = []
     assemblies_fields = []
@@ -72,57 +77,66 @@ def main():
     aggregate_data_records(assemblies, "assemblies")
 
     # collect metadata from the BioSamples
-    # TODO: consider using AsyncIO to improve the speed
-    first_url = (
-        f"{BIOSAMPLES_ROOT_URL}?size=200&filter=attr%3Aproject%20name%3A{
-            PROJECT_TAG}"
-    )
-    samples_response = requests.get(first_url, timeout=60).json()
-    while "_embedded" in samples_response:
-        for sample in samples_response["_embedded"]["samples"]:
-            SAMPLES[sample["accession"]] = sample
-        if "next" in samples_response["_links"]:
-            samples_response = requests.get(
-                samples_response["_links"]["next"]["href"], timeout=60
-            ).json()
-        else:
-            samples_response = requests.get(
-                samples_response["_links"]["last"]["href"], timeout=60
-            ).json()
+    if PROJECT_TAG in ["ASG", "DTOL", "ERGA"]:
+        first_url = (
+            f"{BIOSAMPLES_ROOT_URL}?size=200&filter="
+            f"attr%3Aproject%20name%3A{PROJECT_TAG}"
+        )
+        samples_response = requests.get(first_url, timeout=60).json()
+        while "_embedded" in samples_response:
+            for sample in samples_response["_embedded"]["samples"]:
+                sample["project_name"] = PROJECT_TAG
+                SAMPLES[sample["accession"]] = sample
+            if "next" in samples_response["_links"]:
+                samples_response = requests.get(
+                    samples_response["_links"]["next"]["href"], timeout=60
+                ).json()
+            else:
+                samples_response = requests.get(
+                    samples_response["_links"]["last"]["href"], timeout=60
+                ).json()
 
     # join metadata and data records
-    join_metadata_and_data(EXPERIMENTS, "experiments")
-    join_metadata_and_data(ASSEMBLIES, "assemblies")
+    join_metadata_and_data(EXPERIMENTS, PROJECT_TAG, "experiments")
+    join_metadata_and_data(ASSEMBLIES, PROJECT_TAG, "assemblies")
 
     # check for missing child -> parent relationship records
     additional_samples = dict()
     for sample_id, record in SAMPLES.items():
         if "sample derived from" in record["characteristics"]:
-            host_sample_id = record["characteristics"][
-                "sample derived from"][0]["text"]
+            host_sample_id = record["characteristics"]["sample derived from"][0]["text"]
             if (
                 host_sample_id not in SAMPLES
                 and host_sample_id not in additional_samples
             ):
-                additional_samples[host_sample_id] = requests.get(
-                    f"{BIOSAMPLES_ROOT_URL}/{host_sample_id}", timeout=60
-                ).json()
+                try:
+                    additional_samples[host_sample_id] = requests.get(
+                        f"{BIOSAMPLES_ROOT_URL}/{host_sample_id}", timeout=60
+                    ).json()
+                except json.decoder.JSONDecodeError:
+                    print(f"json decode error for {host_sample_id}")
+                    continue
         elif "sample symbiont of" in record["characteristics"]:
-            host_sample_id = record["characteristics"][
-                "sample symbiont of"][0]["text"]
+            host_sample_id = record["characteristics"]["sample symbiont of"][0]["text"]
             if (
                 host_sample_id not in SAMPLES
                 and host_sample_id not in additional_samples
             ):
-                additional_samples[host_sample_id] = requests.get(
-                    f"{BIOSAMPLES_ROOT_URL}/{host_sample_id}", timeout=60
-                ).json()
+                try:
+                    additional_samples[host_sample_id] = requests.get(
+                        f"{BIOSAMPLES_ROOT_URL}/{host_sample_id}", timeout=60
+                    ).json()
+                except json.decoder.JSONDecodeError:
+                    print(f"json decode error for {host_sample_id}")
+                    continue
     for sample_id, record in additional_samples.items():
+        record["project_name"] = PROJECT_TAG
         SAMPLES[sample_id] = record
 
     # write results in the jsonl format
-    with open("metadata_experiments_assemblies.jsonl", "w",
-              encoding="utf-8") as f:
+    with open(
+        f"metadata_experiments_assemblies_{STUDY_ID}.jsonl", "w", encoding="utf-8"
+    ) as f:
         for sample_id, record in SAMPLES.items():
             f.write(f"{json.dumps(record)}\n")
 
@@ -155,14 +169,16 @@ def parse_data_records(data_records, aggr_var):
     :param aggr_var: variable to aggregate data records
     """
     for record in data_records:
-        aggr_var[record["sample_accession"]].append(record)
+        if record["sample_accession"] != "":
+            aggr_var[record["sample_accession"]].append(record)
 
 
-def join_metadata_and_data(data_records, records_type=None):
+def join_metadata_and_data(data_records, project_name, records_type=None):
     """
     Join records from BioSamples and ENA into python dict(key: biosample_id, \
         value: record)
     :param data_records: experiments and assemblies from ENA
+    : project_name: name of the project to import
     :param records_type: can be of type experiment or assemblies
     """
     if records_type is None:
@@ -175,12 +191,20 @@ def join_metadata_and_data(data_records, records_type=None):
     else:
         for sample_id, data in data_records.items():
             if sample_id not in SAMPLES:
-                SAMPLES[sample_id] = requests.get(
-                    f"{BIOSAMPLES_ROOT_URL}/{sample_id}", timeout=60
-                ).json()
-                SAMPLES[sample_id][records_type] = data
+                try:
+                    response = requests.get(
+                        f"{BIOSAMPLES_ROOT_URL}/{sample_id}", timeout=60
+                    ).json()
+                    if response["status"] == 403:
+                        continue
+                    SAMPLES[sample_id] = response
+                    SAMPLES[sample_id]["project_name"] = project_name
+                    SAMPLES[sample_id][records_type] = data
+                except requests.exceptions.JSONDecodeError:
+                    continue
             else:
-                SAMPLES[sample_id][records_type] = data
+                SAMPLES[sample_id].setdefault(records_type, [])
+                SAMPLES[sample_id][records_type].extend(data)
 
 
 if __name__ == "__main__":
