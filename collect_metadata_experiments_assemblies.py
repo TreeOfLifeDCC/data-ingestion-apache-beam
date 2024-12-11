@@ -11,6 +11,7 @@ from dependencies.samples_schema import samples_schema
 
 EXPERIMENTS: defaultdict[Any, list] = defaultdict(list)
 ASSEMBLIES: defaultdict[Any, list] = defaultdict(list)
+ANALYSES: defaultdict[Any, list] = defaultdict(list)
 SAMPLES = {}
 
 ENA_ROOT_URL = "https://www.ebi.ac.uk/ena/portal/api/filereport"
@@ -25,7 +26,7 @@ parser.add_argument(
     help="Specify Project ENA study id",
 )
 parser.add_argument(
-    "--project",
+    "--project_tag",
     required=True,
     help="Specify Project tag for BioSamples search",
 )
@@ -38,7 +39,8 @@ parser.add_argument(
 opts = parser.parse_args()
 
 STUDY_ID = opts.study_id
-PROJECT_TAG = opts.project
+PROJECT_TAG = opts.project_tag
+PROJECT_NAME = opts.project_name
 
 
 def main():
@@ -46,10 +48,11 @@ def main():
     Collect DToL metadata from BioSamples, experiments and assemblies
     from the ENA
     """
-    print(f"Working on {PROJECT_TAG}")
+    print(f"Working on {PROJECT_NAME}")
     # collect required experiments and assemblies fields
     experiment_fields = []
     assemblies_fields = []
+    analysis_fields = []
     for field in samples_schema["fields"]:
         if field["name"] == "experiments":
             for experiment_field in field["fields"]:
@@ -57,6 +60,9 @@ def main():
         elif field["name"] == "assemblies":
             for assemblies_field in field["fields"]:
                 assemblies_fields.append(assemblies_field["name"])
+        elif field["name"] == "analyses":
+            for analysis_field in field["fields"]:
+                analysis_fields.append(analysis_field["name"])
 
     # Collect all experiments
     raw_data = requests.get(
@@ -70,11 +76,17 @@ def main():
         f"&fields={','.join(assemblies_fields)}&format=json&limit=0",
         timeout=60,
     ).json()
+    # Collect all analyses
+    analyses = requests.get(
+        f"{ENA_ROOT_URL}?accession={STUDY_ID}&result=analysis"
+        f"&fields={','.join(analysis_fields)}&format=json&limit=0",
+        timeout=60,
+    )
 
     # aggregate experiments and assemblies in the dict(key: biosample_id,
     # value: data record)
-    aggregate_data_records(raw_data, "experiments")
-    aggregate_data_records(assemblies, "assemblies")
+    for record_type in ["experiments", "assemblies", "analyses"]:
+        aggregate_data_records(raw_data, record_type)
 
     # collect metadata from the BioSamples
     if PROJECT_TAG in ["ASG", "DTOL", "ERGA"]:
@@ -97,8 +109,8 @@ def main():
                 ).json()
 
     # join metadata and data records
-    join_metadata_and_data(EXPERIMENTS, PROJECT_TAG, "experiments")
-    join_metadata_and_data(ASSEMBLIES, PROJECT_TAG, "assemblies")
+    for record_type in ["experiments", "assemblies", "analyses"]:
+        join_metadata_and_data(EXPERIMENTS, PROJECT_NAME, record_type)
 
     # check for missing child -> parent relationship records
     additional_samples = dict()
@@ -154,6 +166,8 @@ def aggregate_data_records(data_records, records_type=None):
         parse_data_records(data_records, EXPERIMENTS)
     elif records_type == "assemblies":
         parse_data_records(data_records, ASSEMBLIES)
+    elif records_type == "analyses":
+        parse_data_records(data_records, ANALYSES)
     else:
         raise ValueError(
             "records_type must be either 'experiments' or \
@@ -178,12 +192,12 @@ def join_metadata_and_data(data_records, project_name, records_type=None):
     Join records from BioSamples and ENA into python dict(key: biosample_id, \
         value: record)
     :param data_records: experiments and assemblies from ENA
-    : project_name: name of the project to import
+    :param project_name: name of the project to import
     :param records_type: can be of type experiment or assemblies
     """
     if records_type is None:
         raise ValueError("records_type must be specified")
-    if records_type not in ["experiments", "assemblies"]:
+    if records_type not in ["experiments", "assemblies", "analyses"]:
         raise ValueError(
             "records_type must be either 'experiments' or \
                          'assemblies'"
@@ -205,6 +219,7 @@ def join_metadata_and_data(data_records, project_name, records_type=None):
             else:
                 SAMPLES[sample_id].setdefault(records_type, [])
                 SAMPLES[sample_id][records_type].extend(data)
+                SAMPLES[sample_id]["project_name"] = project_name
 
 
 if __name__ == "__main__":
