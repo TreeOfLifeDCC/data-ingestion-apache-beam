@@ -105,6 +105,8 @@ samples_schema = {
                 {"name": "analysis_accession", "type": "STRING", "mode": "NULLABLE"},
                 {"name": "analysis_type", "type": "STRING", "mode": "NULLABLE"},
                 {"name": "submitted_ftp", "type": "STRING", "mode": "NULLABLE"},
+                {"name": "assembly_type", "type": "STRING", "mode": "NULLABLE"},
+                {"name": "scientific_name", "type": "STRING", "mode": "NULLABLE"},
             ],
         },
         {

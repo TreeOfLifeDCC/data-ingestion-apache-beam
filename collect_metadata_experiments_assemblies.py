@@ -1,6 +1,3 @@
-"""Script to create jsonl data for ingestion"""
-
-import argparse
 import json
 from collections import defaultdict
 from typing import Any
@@ -9,50 +6,25 @@ import requests
 
 from dependencies.samples_schema import samples_schema
 
-EXPERIMENTS: defaultdict[Any, list] = defaultdict(list)
-ASSEMBLIES: defaultdict[Any, list] = defaultdict(list)
-ANALYSES: defaultdict[Any, list] = defaultdict(list)
-SAMPLES = {}
 
-ENA_ROOT_URL = "https://www.ebi.ac.uk/ena/portal/api/filereport"
-BIOSAMPLES_ROOT_URL = "https://www.ebi.ac.uk/biosamples/samples"
-
-parser = argparse.ArgumentParser(
-    description="Collect metadata, experiments and assemblies"
-)
-parser.add_argument(
-    "--study_id",
-    required=True,
-    help="Specify Project ENA study id",
-)
-parser.add_argument(
-    "--project_tag",
-    required=True,
-    help="Specify Project tag for BioSamples search",
-)
-
-parser.add_argument(
-    "--project_name",
-    required=True,
-    help="Specify Project Name for Data Portal",
-)
-opts = parser.parse_args()
-
-STUDY_ID = opts.study_id
-PROJECT_TAG = opts.project_tag
-PROJECT_NAME = opts.project_name
-
-
-def main():
+def main(study_id: str, project_tag: str, project_name: str) -> dict[str, dict]:
     """
-    Collect DToL metadata from BioSamples, experiments and assemblies
+    Collect DToL metadata from BioSamples, experiments, assemblies and analyses
     from the ENA
     """
-    print(f"Working on {PROJECT_NAME}")
-    # collect required experiments and assemblies fields
-    experiment_fields = []
-    assemblies_fields = []
-    analysis_fields = []
+    experiments_aggr: defaultdict[str, list] = defaultdict(list)
+    assemblies_aggr: defaultdict[str, list] = defaultdict(list)
+    analyses_aggr: defaultdict[str, list] = defaultdict(list)
+    samples: dict[str, dict] = {}
+
+    ena_root_url = "https://www.ebi.ac.uk/ena/portal/api/filereport"
+    biosamples_root_url = "https://www.ebi.ac.uk/biosamples/samples"
+
+    # Collect required experiments, assemblies and analyses fields
+    experiment_fields: list[str | None] = []
+    assemblies_fields: list[str | None] = []
+    analysis_fields: list[str | None] = []
+
     for field in samples_schema["fields"]:
         if field["name"] == "experiments":
             for experiment_field in field["fields"]:
@@ -66,39 +38,45 @@ def main():
 
     # Collect all experiments
     raw_data = requests.get(
-        f"{ENA_ROOT_URL}?accession={STUDY_ID}&result=read_run"
+        f"{ena_root_url}?accession={study_id}&result=read_run"
         f"&fields={','.join(experiment_fields)}&format=json&limit=0",
         timeout=60,
     ).json()
+
     # Collect all assemblies
     assemblies = requests.get(
-        f"{ENA_ROOT_URL}?accession={STUDY_ID}&result=assembly"
+        f"{ena_root_url}?accession={study_id}&result=assembly"
         f"&fields={','.join(assemblies_fields)}&format=json&limit=0",
         timeout=60,
     ).json()
+
     # Collect all analyses
     analyses = requests.get(
-        f"{ENA_ROOT_URL}?accession={STUDY_ID}&result=analysis"
+        f"{ena_root_url}?accession={study_id}&result=analysis"
         f"&fields={','.join(analysis_fields)}&format=json&limit=0",
         timeout=60,
-    )
+    ).json()
 
-    # aggregate experiments and assemblies in the dict(key: biosample_id,
-    # value: data record)
-    for record_type in ["experiments", "assemblies", "analyses"]:
-        aggregate_data_records(raw_data, record_type)
+    # aggregate experiments, assemblies and analyses in the
+    # dict(key: biosample_id, value: data record)
+    for aggr_var, records_data in [
+        (experiments_aggr, raw_data),
+        (assemblies_aggr, assemblies),
+        (analyses_aggr, analyses),
+    ]:
+        parse_data_records(aggr_var, records_data)
 
     # collect metadata from the BioSamples
-    if PROJECT_TAG in ["ASG", "DTOL", "ERGA"]:
+    if project_tag in ["ASG", "DTOL", "ERGA"]:
         first_url = (
-            f"{BIOSAMPLES_ROOT_URL}?size=200&filter="
-            f"attr%3Aproject%20name%3A{PROJECT_TAG}"
+            f"{biosamples_root_url}?size=200&filter="
+            f"attr%3Aproject%20name%3A{project_tag}"
         )
         samples_response = requests.get(first_url, timeout=60).json()
         while "_embedded" in samples_response:
             for sample in samples_response["_embedded"]["samples"]:
-                sample["project_name"] = PROJECT_TAG
-                SAMPLES[sample["accession"]] = sample
+                sample["project_name"] = project_tag
+                samples[sample["accession"]] = sample
             if "next" in samples_response["_links"]:
                 samples_response = requests.get(
                     samples_response["_links"]["next"]["href"], timeout=60
@@ -109,21 +87,27 @@ def main():
                 ).json()
 
     # join metadata and data records
-    for record_type in ["experiments", "assemblies", "analyses"]:
-        join_metadata_and_data(EXPERIMENTS, PROJECT_NAME, record_type)
+    for record_type, agg_name in {
+        "experiments": experiments_aggr,
+        "assemblies": assemblies_aggr,
+        "analyses": analyses_aggr,
+    }.items():
+        join_metadata_and_data(
+            record_type, agg_name, project_name, samples, biosamples_root_url
+        )
 
     # check for missing child -> parent relationship records
     additional_samples = dict()
-    for sample_id, record in SAMPLES.items():
+    for sample_id, record in samples.items():
         if "sample derived from" in record["characteristics"]:
             host_sample_id = record["characteristics"]["sample derived from"][0]["text"]
             if (
-                host_sample_id not in SAMPLES
+                host_sample_id not in samples
                 and host_sample_id not in additional_samples
             ):
                 try:
                     additional_samples[host_sample_id] = requests.get(
-                        f"{BIOSAMPLES_ROOT_URL}/{host_sample_id}", timeout=60
+                        f"{biosamples_root_url}/{host_sample_id}", timeout=60
                     ).json()
                 except json.decoder.JSONDecodeError:
                     print(f"json decode error for {host_sample_id}")
@@ -131,96 +115,72 @@ def main():
         elif "sample symbiont of" in record["characteristics"]:
             host_sample_id = record["characteristics"]["sample symbiont of"][0]["text"]
             if (
-                host_sample_id not in SAMPLES
+                host_sample_id not in samples
                 and host_sample_id not in additional_samples
             ):
                 try:
                     additional_samples[host_sample_id] = requests.get(
-                        f"{BIOSAMPLES_ROOT_URL}/{host_sample_id}", timeout=60
+                        f"{biosamples_root_url}/{host_sample_id}", timeout=60
                     ).json()
                 except json.decoder.JSONDecodeError:
                     print(f"json decode error for {host_sample_id}")
                     continue
     for sample_id, record in additional_samples.items():
-        record["project_name"] = PROJECT_TAG
-        SAMPLES[sample_id] = record
+        record["project_name"] = project_tag
+        samples[sample_id] = record
 
-    # write results in the jsonl format
-    with open(
-        f"metadata_experiments_assemblies_{STUDY_ID}.jsonl", "w", encoding="utf-8"
-    ) as f:
-        for sample_id, record in SAMPLES.items():
-            f.write(f"{json.dumps(record)}\n")
+    return samples
 
 
-def aggregate_data_records(data_records, records_type=None):
-    """
-    Aggregate experiments and assemblies from the ENA into \
-        python dict(key: biosample_id, value: data_record)
-    :param data_records: experiments and assemblies from ENA
-    :param records_type: can be of type experiment or assemblies
-    """
-    if records_type is None:
-        raise ValueError("records_type must be specified")
-    elif records_type == "experiments":
-        parse_data_records(data_records, EXPERIMENTS)
-    elif records_type == "assemblies":
-        parse_data_records(data_records, ASSEMBLIES)
-    elif records_type == "analyses":
-        parse_data_records(data_records, ANALYSES)
-    else:
-        raise ValueError(
-            "records_type must be either 'experiments' or \
-                         'assemblies'"
-        )
-
-
-def parse_data_records(data_records, aggr_var):
+def parse_data_records(aggr_var: defaultdict[Any, list], records_data: dict) -> None:
     """
     Parse data records from ENA into python dict(key: biosample_id, \
         value: data_record)
-    :param data_records: experiments and assemblies from ENA
     :param aggr_var: variable to aggregate data records
+    :param records_data: experiments and assemblies from ENA
     """
-    for record in data_records:
+    for record in records_data:
         if record["sample_accession"] != "":
             aggr_var[record["sample_accession"]].append(record)
 
 
-def join_metadata_and_data(data_records, project_name, records_type=None):
+def join_metadata_and_data(
+    records_type: str,
+    records_data: dict,
+    project_name: str,
+    samples: dict[str, dict],
+    biosamples_root_url: str,
+) -> None:
     """
     Join records from BioSamples and ENA into python dict(key: biosample_id, \
         value: record)
-    :param data_records: experiments and assemblies from ENA
-    :param project_name: name of the project to import
     :param records_type: can be of type experiment or assemblies
+    :param records_data: experiments and assemblies from ENA
+    :param project_name: name of the project to import
+    :param samples: existing samples data
+    :param biosamples_root_url: biosamples root url
+
     """
-    if records_type is None:
-        raise ValueError("records_type must be specified")
     if records_type not in ["experiments", "assemblies", "analyses"]:
         raise ValueError(
             "records_type must be either 'experiments' or \
                          'assemblies'"
         )
     else:
-        for sample_id, data in data_records.items():
-            if sample_id not in SAMPLES:
+        for sample_id, data in records_data.items():
+            if sample_id not in samples:
                 try:
                     response = requests.get(
-                        f"{BIOSAMPLES_ROOT_URL}/{sample_id}", timeout=60
+                        f"{biosamples_root_url}/{sample_id}", timeout=60
                     ).json()
                     if response["status"] == 403:
                         continue
-                    SAMPLES[sample_id] = response
-                    SAMPLES[sample_id]["project_name"] = project_name
-                    SAMPLES[sample_id][records_type] = data
+                    samples[sample_id] = response
+                    samples[sample_id]["project_name"] = project_name
+                    samples[sample_id][records_type] = data
                 except requests.exceptions.JSONDecodeError:
                     continue
             else:
-                SAMPLES[sample_id].setdefault(records_type, [])
-                SAMPLES[sample_id][records_type].extend(data)
-                SAMPLES[sample_id]["project_name"] = project_name
-
-
-if __name__ == "__main__":
-    main()
+                samples[sample_id].setdefault(records_type, [])
+                samples[sample_id][records_type].extend(data)
+                samples[sample_id]["project_name"] = project_name
