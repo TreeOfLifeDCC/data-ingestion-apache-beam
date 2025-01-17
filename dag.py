@@ -4,7 +4,12 @@ import json
 from airflow.decorators import dag, task
 from airflow.io.path import ObjectStoragePath
 
-from dependencies.biodiversity_projects import gbdp_projects
+from dependencies.biodiversity_projects import (
+    gbdp_projects,
+    erga_projects,
+    dtol_projects,
+    asg_projects,
+)
 
 
 @task
@@ -67,6 +72,36 @@ def biodiversity_metadata_ingestion():
             )
         )
     gbdp_metadata_import_tasks >> start_apache_beam_gbdp()
+
+    erga_metadata_import_tasks = []
+    for study_id, item in erga_projects.items():
+        project_name, bucket_name = item["project_name"], item["bucket_name"]
+        erga_metadata_import_tasks.append(
+            get_metadata.override(task_id=f"erga_{study_id}_get_metadata")(
+                study_id, project_name, bucket_name
+            )
+        )
+    erga_metadata_import_tasks >> start_apache_beam_erga()
+
+    dtol_metadata_import_tasks = []
+    for study_id, item in dtol_projects.items():
+        project_name, bucket_name = item["project_name"], item["bucket_name"]
+        dtol_metadata_import_tasks.append(
+            get_metadata.override(task_id=f"dtol_{study_id}_get_metadata")(
+                study_id, project_name, bucket_name
+            )
+        )
+    dtol_metadata_import_tasks >> start_apache_beam_dtol()
+
+    asg_metadata_import_tasks = []
+    for study_id, item in asg_projects.items():
+        project_name, bucket_name = item["project_name"], item["bucket_name"]
+        asg_metadata_import_tasks.append(
+            get_metadata.override(task_id=f"asg_{study_id}_get_metadata")(
+                study_id, project_name, bucket_name
+            )
+        )
+    asg_metadata_import_tasks >> start_apache_beam_asg()
 
 
 biodiversity_metadata_ingestion()
