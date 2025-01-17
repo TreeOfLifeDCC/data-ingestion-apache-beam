@@ -4,28 +4,46 @@ import json
 from airflow.decorators import dag, task
 from airflow.io.path import ObjectStoragePath
 
-from dependencies.biodiversity_projects import biodiversity_projects
+from dependencies.biodiversity_projects import gbdp_projects
 
 
 @task
-def get_metadata(
-        study_id: str, project_name: str, buckets_names: list, **kwargs) -> None:
+def get_metadata(study_id: str, project_name: str, bucket_name: str, **kwargs) -> None:
     import collect_metadata_experiments_assemblies
 
-    project_tag = project_name
+    if "ERGA" in project_name:
+        project_tag = "ERGA"
+    else:
+        project_tag = project_name
     metadata = collect_metadata_experiments_assemblies.main(
-        study_id, project_tag, project_name)
+        study_id, project_tag, project_name
+    )
 
-    for bucket_name in buckets_names:
-        base = ObjectStoragePath(f"gs://google_cloud_default@{bucket_name}")
-        base.mkdir(exist_ok=True)
-        path = base / f"{study_id}.jsonl"
-        with path.open("w") as file:
-            for sample_id, record in metadata.items():
-                file.write(f"{json.dumps(record)}\n")
+    base = ObjectStoragePath(f"gs://google_cloud_default@{bucket_name}")
+    base.mkdir(exist_ok=True)
+    path = base / f"{study_id}.jsonl"
+    with path.open("w") as file:
+        for sample_id, record in metadata.items():
+            file.write(f"{json.dumps(record)}\n")
+
 
 @task
-def end(**kwargs) -> None:
+def start_apache_beam_gbdp(**kwargs) -> None:
+    print("DONE")
+
+
+@task
+def start_apache_beam_erga(**kwargs) -> None:
+    print("DONE")
+
+
+@task
+def start_apache_beam_dtol(**kwargs) -> None:
+    print("DONE")
+
+
+@task
+def start_apache_beam_asg(**kwargs) -> None:
     print("DONE")
 
 
@@ -40,12 +58,15 @@ def biodiversity_metadata_ingestion():
     This DAG builds BigQuery tables and ElasticSearch indexes for all
     biodiversity projects
     """
-    metadata_import_tasks = []
-    for study_id, item in biodiversity_projects.items():
-        project_name = item[0]
-        buckets_names = item[1]
-        metadata_import_tasks.append(get_metadata.override(
-            task_id=f"{study_id}_get_metadata")(
-            study_id, project_name, buckets_names))
-    metadata_import_tasks >> end()
+    gbdp_metadata_import_tasks = []
+    for study_id, item in gbdp_projects.items():
+        project_name, bucket_name = item["project_name"], item["bucket_name"]
+        gbdp_metadata_import_tasks.append(
+            get_metadata.override(task_id=f"gbdp_{study_id}_get_metadata")(
+                study_id, project_name, bucket_name
+            )
+        )
+    gbdp_metadata_import_tasks >> start_apache_beam_gbdp()
+
+
 biodiversity_metadata_ingestion()
