@@ -3,9 +3,6 @@ import json
 
 from airflow.decorators import dag, task
 from airflow.io.path import ObjectStoragePath
-from airflow.providers.google.cloud.operators.dataflow import (
-    DataflowTemplatedJobStartOperator,
-)
 
 from dependencies.biodiversity_projects import (
     gbdp_projects,
@@ -66,6 +63,36 @@ def biodiversity_metadata_ingestion():
     This DAG builds BigQuery tables and ElasticSearch indexes for all
     biodiversity projects
     """
+    # TODO: refactor this repeated logic
+    gbdp_metadata_import_tasks = []
+    for study_id, item in gbdp_projects.items():
+        project_name, bucket_name = item["project_name"], item["bucket_name"]
+        gbdp_metadata_import_tasks.append(
+            get_metadata.override(task_id=f"gbdp_{study_id}_get_metadata")(
+                study_id, project_name, bucket_name
+            )
+        )
+    gbdp_metadata_import_tasks >> start_apache_beam_gbdp()
+
+    erga_metadata_import_tasks = []
+    for study_id, item in erga_projects.items():
+        project_name, bucket_name = item["project_name"], item["bucket_name"]
+        erga_metadata_import_tasks.append(
+            get_metadata.override(task_id=f"erga_{study_id}_get_metadata")(
+                study_id, project_name, bucket_name
+            )
+        )
+    erga_metadata_import_tasks >> start_apache_beam_erga()
+
+    dtol_metadata_import_tasks = []
+    for study_id, item in dtol_projects.items():
+        project_name, bucket_name = item["project_name"], item["bucket_name"]
+        dtol_metadata_import_tasks.append(
+            get_metadata.override(task_id=f"dtol_{study_id}_get_metadata")(
+                study_id, project_name, bucket_name
+            )
+        )
+    dtol_metadata_import_tasks >> start_apache_beam_dtol()
 
     asg_metadata_import_tasks = []
     for study_id, item in asg_projects.items():
@@ -75,17 +102,7 @@ def biodiversity_metadata_ingestion():
                 study_id, project_name, bucket_name
             )
         )
-
-    start_template_job = DataflowTemplatedJobStartOperator(
-        task_id="start_template_job",
-        project_id="prj-ext-prod-biodiv-data-in",
-        template="gs://prj-ext-prod-biodiv-data-in_cloudbuild/getting_started-py.json",
-        parameters={"output": "gs://prj-ext-prod-biodiv-data-in-airflow-logs/output-"},
-        location="europe-west2",
-        wait_until_finished=True,
-        )
-
-    asg_metadata_import_tasks >> start_template_job()
+    asg_metadata_import_tasks >> start_apache_beam_asg()
 
 
 biodiversity_metadata_ingestion()
